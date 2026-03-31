@@ -106,6 +106,7 @@ export class CheatingDaddyApp extends LitElement {
         selectedImageQuality: { type: String },
         layoutMode: { type: String },
         backgroundTransparency: { type: Number },
+        isNavbarHidden: { type: Boolean },
         _viewInstances: { type: Object, state: true },
         _isClickThrough: { state: true },
         _awaitingNewResponse: { state: true },
@@ -127,6 +128,7 @@ export class CheatingDaddyApp extends LitElement {
         this.selectedImageQuality = 'medium';
         this.layoutMode = 'normal';
         this.backgroundTransparency = 0.8;
+        this.isNavbarHidden = false;
         this.responses = [];
         this.currentResponseIndex = -1;
         this._viewInstances = new Map();
@@ -252,6 +254,10 @@ export class CheatingDaddyApp extends LitElement {
             });
             ipcRenderer.on('background-opacity-changed', (_, opacity) => {
                 this.backgroundTransparency = opacity;
+                this.requestUpdate();
+            });
+            ipcRenderer.on('toggle-navbar', () => {
+                this.isNavbarHidden = !this.isNavbarHidden;
                 this.requestUpdate();
             });
         }
@@ -596,6 +602,7 @@ export class CheatingDaddyApp extends LitElement {
                         .statusText=${this.statusText}
                         .startTime=${this.startTime}
                         .backgroundTransparency=${this.backgroundTransparency}
+                        .isNavbarHidden=${this.isNavbarHidden}
                         .onCustomizeClick=${() => this.handleCustomizeClick()}
                         .onHelpClick=${() => this.handleHelpClick()}
                         .onHistoryClick=${() => this.handleHistoryClick()}

@@ -318,6 +318,10 @@ export class HelpView extends LitElement {
                                 <span class="shortcut-description">Kill Switch (Close + Save)</span>
                                 <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Shift</span><span class="key">Delete</span></div>
                             </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Toggle Navbar</span>
+                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Alt</span><span class="key">N</span></div>
+                            </div>
                         </div>
 
                         <div class="keyboard-group">

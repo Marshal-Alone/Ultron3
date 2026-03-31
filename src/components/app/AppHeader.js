@@ -156,6 +156,7 @@ export class AppHeader extends LitElement {
         statusText: { type: String },
         startTime: { type: Number },
         backgroundTransparency: { type: Number },
+        isNavbarHidden: { type: Boolean },
         onCustomizeClick: { type: Function },
         onHelpClick: { type: Function },
         onHistoryClick: { type: Function },
@@ -173,6 +174,7 @@ export class AppHeader extends LitElement {
         this.statusText = '';
         this.startTime = null;
         this.backgroundTransparency = 0.8;
+        this.isNavbarHidden = false;
         this.onCustomizeClick = () => { };
         this.onHelpClick = () => { };
         this.onHistoryClick = () => { };
@@ -354,7 +356,7 @@ export class AppHeader extends LitElement {
 
     render() {
         const elapsedTime = this.getElapsedTime();
-        const shouldHideHeader = this.currentView === 'assistant' && this.backgroundTransparency < 0.7;
+        const shouldHideHeader = this.isNavbarHidden || (this.currentView === 'assistant' && this.backgroundTransparency < 0.7);
         const headerClass = shouldHideHeader ? 'header hidden' : 'header';
 
         return html`

@@ -769,12 +769,14 @@ ipcRenderer.on('adjust-transparency', async (event, delta) => {
         newValue = Math.max(0, Math.min(1, newValue)); // Clamp between 0 and 1
         await storage.updatePreference('backgroundTransparency', newValue);
 
+        
         // Apply immediately
         const themeName = prefs.theme || 'dark';
         const colors = theme.get(themeName);
         theme.applyBackgrounds(colors.background, newValue);
-
+        ipcRenderer.send('background-opacity-changed', newValue);  // ← ADD THIS LINE
         console.log('Transparency set to:', newValue);
+
     } catch (error) {
         console.error('Error adjusting transparency:', error);
     }

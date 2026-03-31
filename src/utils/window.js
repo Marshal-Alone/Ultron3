@@ -114,6 +114,7 @@ function getDefaultKeybinds() {
         increaseFontSize: isMac ? 'Cmd+Alt+]' : 'Ctrl+Alt+]',
         askClipboard: isMac ? 'Cmd+Alt+P' : 'Ctrl+Alt+P',
         toggleStealth: isMac ? 'Cmd+Alt+L' : 'Ctrl+Alt+L',
+        toggleNavbar: isMac ? 'Cmd+Alt+N' : 'Ctrl+Alt+N',
         quickStartGroq: isMac ? 'Cmd+Shift+S' : 'Ctrl+Shift+S',
         quickStop: 'Alt+S',
         killSwitch: isMac ? 'Cmd+Shift+Delete' : 'Ctrl+Shift+Delete',
@@ -467,6 +468,19 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
         }
     }
 
+    // Register Ctrl+Alt+N for navbar toggle
+    if (keybinds.toggleNavbar) {
+        try {
+            globalShortcut.register(keybinds.toggleNavbar, () => {
+                console.log('=== TOGGLE NAVBAR ===');
+                sendToRenderer('toggle-navbar');
+            });
+            console.log(`Registered toggleNavbar: ${keybinds.toggleNavbar}`);
+        } catch (error) {
+            console.error(`Failed to register toggleNavbar:`, error);
+        }
+    }
+
     // ==================== QUICK START & KILL SWITCH ====================
 
     // Register Quick Start Groq shortcut (Ctrl+Shift+S / Cmd+Shift+S)
@@ -653,7 +667,6 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
                     windowResizing = false;
 
                     if (!mainWindow.isDestroyed()) {
-                        mainWindow.setResizable(false);
                         mainWindow.setSize(targetWidth, targetHeight);
                         const finalX = Math.floor((screenWidth - targetWidth) / 2);
                         mainWindow.setPosition(finalX, 0);
