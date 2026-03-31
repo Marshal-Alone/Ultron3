@@ -999,16 +999,16 @@ export class CustomizeView extends LitElement {
                 name: 'Increase Font Size',
                 description: 'Make response text larger',
             },
-            {
-                key: 'askClipboard',
-                name: 'Stealth Paste (Clipboard Ask)',
-                description: 'Ask AI about text currently in your clipboard',
-            },
-            {
-                key: 'toggleStealth',
-                name: 'Stealth Mode (Focus Lock)',
-                description: 'Toggle window focusability to avoid detection',
-            },
+            // {
+            //     key: 'askClipboard',
+            //     name: 'Stealth Paste (Clipboard Ask)',
+            //     description: 'Ask AI about text currently in your clipboard',
+            // },
+            // {
+            //     key: 'toggleStealth',
+            //     name: 'Stealth Mode (Focus Lock)',
+            //     description: 'Toggle window focusability to avoid detection',
+            // },
             {
                 key: 'toggleAiProvider',
                 name: 'Switch AI Provider',
@@ -1172,6 +1172,9 @@ export class CustomizeView extends LitElement {
         this.backgroundTransparency = parseFloat(e.target.value);
         await cheatingDaddy.storage.updatePreference('backgroundTransparency', this.backgroundTransparency);
         this.updateBackgroundAppearance();
+        // Notify app about opacity change so navbar can hide/show
+        const { ipcRenderer } = require('electron');
+        ipcRenderer.send('background-opacity-changed', this.backgroundTransparency);
         this.requestUpdate();
     }
 

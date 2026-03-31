@@ -414,6 +414,201 @@ function deleteAllSessions() {
     }
 }
 
+// ============ WINDOW SIZE ============
+
+function getWindowSize() {
+    const prefs = getPreferences();
+    return {
+        width: prefs.windowWidth || 1100,
+        height: prefs.windowHeight || 800
+    };
+}
+
+function setWindowSize(width, height) {
+    return updatePreference('windowWidth', width) && updatePreference('windowHeight', height);
+}
+
+// ============ SCREENSHOT SAVING ============
+
+/**
+ * Save a screenshot from screen analysis
+ * @param {string} base64Data - Base64 encoded image data
+ * @param {string} sessionId - Session ID for organizing screenshots
+ * @returns {Object} {success: boolean, filename?: string, path?: string, error?: string}
+ */
+function saveSessionScreenshot(base64Data, sessionId, aiResponse = null) {
+    try {
+        const downloadsPath = path.join(os.homedir(), 'Downloads');
+        const conversationsDir = path.join(downloadsPath, 'Ultron-Conversations');
+        
+        // Ensure main conversations directory exists
+        if (!fs.existsSync(conversationsDir)) {
+            fs.mkdirSync(conversationsDir, { recursive: true });
+        }
+        
+        // Create a session-specific screenshots folder
+        const screenshotsDir = path.join(conversationsDir, `session_${sessionId}_screenshots`);
+        if (!fs.existsSync(screenshotsDir)) {
+            fs.mkdirSync(screenshotsDir, { recursive: true });
+        }
+        
+        // Generate filename with timestamp
+        const now = new Date();
+        const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}_${Date.now() % 1000}`;
+        const filename = `screenshot_${timestamp}.png`;
+        const filepath = path.join(screenshotsDir, filename);
+        
+        // Convert base64 to buffer and save
+        const buffer = Buffer.from(base64Data, 'base64');
+        fs.writeFileSync(filepath, buffer);
+        // Screenshot saved
+        
+        // Save AI response as metadata JSON file alongside the screenshot
+        if (aiResponse) {
+            const metadataFilename = `screenshot_${timestamp}_response.json`;
+            const metadataPath = path.join(screenshotsDir, metadataFilename);
+            const metadata = {
+                timestamp: Date.now(),
+                screenshotFilename: filename,
+                aiResponse: aiResponse,
+                responseTimestamp: new Date().toISOString()
+            };
+            fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+            // Response metadata saved
+        }
+        
+        // Track screenshot in session with base64 data for history display
+        const session = getSession(sessionId);
+        if (session) {
+            if (!session.screenshotReferences) {
+                session.screenshotReferences = [];
+            }
+            session.screenshotReferences.push({
+                timestamp: Date.now(),
+                filename: filename,
+                imagePath: filepath,
+                base64Data: base64Data,  // Store base64 for history display
+                aiResponse: aiResponse || undefined
+            });
+            saveSession(sessionId, session);
+        }
+        
+        return { success: true, filename, path: filepath, hasResponse: Boolean(aiResponse) };
+    } catch (error) {
+        console.error('❌ Error saving screenshot:', error.message);
+        return { success: false, error: error.message };
+    }
+}
+
+// ============ EXPORT SESSION ============
+
+/**
+ * Export a session to Downloads folder with timestamp naming
+ * Format: conversation_YYYY-MM-DD_HHmmss.json (JSON data)
+ * Also creates conversation_YYYY-MM-DD_HHmmss.md (readable Q&A format)
+ * And conversation_YYYY-MM-DD_HHmmss/ (folder with screenshots if any)
+ */
+function exportSessionToDownloads(sessionId) {
+    try {
+        const session = getSession(sessionId);
+        if (!session) {
+            console.error(`Session ${sessionId} not found`);
+            return { success: false, error: 'Session not found' };
+        }
+
+        // Get Downloads folder path
+        const downloadsPath = path.join(os.homedir(), 'Downloads');
+        const conversationsDir = path.join(downloadsPath, 'Ultron-Conversations');
+        
+        // Ensure directory structure exists
+        if (!fs.existsSync(conversationsDir)) {
+            fs.mkdirSync(conversationsDir, { recursive: true });
+        }
+        
+        // Create timestamp: YYYY-MM-DD_HHmmss
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const timestamp = `${year}-${month}-${day}_${hours}${minutes}${seconds}`;
+        
+        // Create conversation folder structure
+        const conversationFolder = path.join(conversationsDir, `conversation_${timestamp}`);
+        if (!fs.existsSync(conversationFolder)) {
+            fs.mkdirSync(conversationFolder, { recursive: true });
+        }
+        
+        const files = [];
+        
+        // 1. Export JSON data
+        const jsonFilename = `conversation_${timestamp}.json`;
+        const jsonFilepath = path.join(conversationFolder, jsonFilename);
+        const exportData = {
+            ...session,
+            exportedAt: Date.now(),
+            exportedAtFormatted: now.toISOString()
+        };
+        fs.writeFileSync(jsonFilepath, JSON.stringify(exportData, null, 2), 'utf8');
+        console.log(`Session JSON exported to: ${jsonFilepath}`);
+        files.push(jsonFilepath);
+        
+        // 2. Export as readable Markdown (Q&A pairs with screenshot references)
+        const mdFilename = `conversation_${timestamp}.md`;
+        const mdFilepath = path.join(conversationFolder, mdFilename);
+        let mdContent = `# Conversation - Q&A with Screenshots\n\n`;
+        mdContent += `**Date:** ${new Date(session.createdAt).toLocaleString()}\n`;
+        mdContent += `**Profile:** ${session.profile || 'N/A'}\n`;
+        if (session.customPrompt) {
+            mdContent += `**Custom Prompt:** ${session.customPrompt}\n`;
+        }
+        mdContent += `**Total Q&A Pairs:** ${session.conversationHistory?.length || 0}\n`;
+        mdContent += `**Screenshots Captured:** ${session.screenshotReferences?.length || 0}\n`;
+        mdContent += `**Note:** Screenshots saved in 'screenshots' subfolder\n\n`;
+        mdContent += `---\n\n`;
+        
+        if (session.conversationHistory && session.conversationHistory.length > 0) {
+            session.conversationHistory.forEach((turn, index) => {
+                mdContent += `### Q${index + 1}: User\n\n`;
+                mdContent += `${turn.transcription}\n\n`;
+                mdContent += `### A${index + 1}: AI Response\n\n`;
+                mdContent += `${turn.ai_response}\n\n`;
+                mdContent += `---\n\n`;
+            });
+        }
+        
+        fs.writeFileSync(mdFilepath, mdContent, 'utf8');
+        console.log(`✅ Markdown exported to: ${mdFilepath}`);
+        files.push(mdFilepath);
+        
+        // 3. Copy screenshots to conversations folder
+        const oldScreenshotsDir = path.join(conversationsDir, `session_${sessionId}_screenshots`);
+        if (fs.existsSync(oldScreenshotsDir)) {
+            const screenshotsFolder = path.join(conversationFolder, 'screenshots');
+            if (!fs.existsSync(screenshotsFolder)) {
+                fs.mkdirSync(screenshotsFolder, { recursive: true });
+            }
+            
+            // Copy all screenshots
+            const screenshotFiles = fs.readdirSync(oldScreenshotsDir);
+            screenshotFiles.forEach(file => {
+                const source = path.join(oldScreenshotsDir, file);
+                const dest = path.join(screenshotsFolder, file);
+                fs.copyFileSync(source, dest);
+            });
+            console.log(`✅ ${screenshotFiles.length} screenshots copied to: ${screenshotsFolder}`);
+            files.push(screenshotsFolder);
+        }
+        
+        return { success: true, filepaths: files, timestamp, folder: conversationFolder };
+    } catch (error) {
+        console.error('Error exporting session:', error.message);
+        return { success: false, error: error.message };
+    }
+}
+
 // ============ CLEAR ALL DATA ============
 
 function clearAllData() {
@@ -461,6 +656,16 @@ module.exports = {
     getAllSessions,
     deleteSession,
     deleteAllSessions,
+
+    // Window Size
+    getWindowSize,
+    setWindowSize,
+
+    // Screenshots
+    saveSessionScreenshot,
+
+    // Export
+    exportSessionToDownloads,
 
     // Clear all
     clearAllData

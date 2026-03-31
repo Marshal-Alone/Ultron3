@@ -10,9 +10,10 @@ let resizeAnimation = null;
 const RESIZE_ANIMATION_DURATION = 500; // milliseconds
 
 function createWindow(sendToRenderer, geminiSessionRef) {
-    // Get layout preference (default to 'normal')
-    let windowWidth = 1100;
-    let windowHeight = 800;
+    // Get saved window size from storage, or use defaults
+    const savedSize = storage.getWindowSize();
+    let windowWidth = savedSize.width || 1100;
+    let windowHeight = savedSize.height || 800;
 
     const mainWindow = new BrowserWindow({
         width: windowWidth,
@@ -44,8 +45,15 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         { useSystemPicker: true }
     );
 
-    mainWindow.setResizable(false);
+    // Enable window resizing - user can drag corners/edges to resize
+    mainWindow.setResizable(true);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    
+    // Listen for window resize events and save the size
+    mainWindow.on('resized', () => {
+        const [width, height] = mainWindow.getSize();
+        storage.setWindowSize(width, height);
+    });
 
     // Make window invisible to screen capture and recording software
     // This is critical for the app's purpose - hiding from screen shares
@@ -106,6 +114,11 @@ function getDefaultKeybinds() {
         increaseFontSize: isMac ? 'Cmd+Alt+]' : 'Ctrl+Alt+]',
         askClipboard: isMac ? 'Cmd+Alt+P' : 'Ctrl+Alt+P',
         toggleStealth: isMac ? 'Cmd+Alt+L' : 'Ctrl+Alt+L',
+        quickStartGroq: isMac ? 'Cmd+Shift+S' : 'Ctrl+Shift+S',
+        quickStop: 'Alt+S',
+        killSwitch: isMac ? 'Cmd+Shift+Delete' : 'Ctrl+Shift+Delete',
+        quickStop: 'Alt+S',
+        killSwitch: isMac ? 'Cmd+Shift+Delete' : 'Ctrl+Shift+Delete',
     };
 }
 
@@ -452,6 +465,93 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
         } catch (error) {
             console.error(`Failed to register toggleStealth:`, error);
         }
+    }
+
+    // ==================== QUICK START & KILL SWITCH ====================
+
+    // Register Quick Start Groq shortcut (Ctrl+Shift+S / Cmd+Shift+S)
+    const isMac = process.platform === 'darwin';
+    const quickStartGroqShortcut = isMac ? 'Cmd+Shift+S' : 'Ctrl+Shift+S';
+    try {
+        globalShortcut.register(quickStartGroqShortcut, async () => {
+            console.log('=== QUICK START GROQ SHORTCUT TRIGGERED ===');
+            try {
+                const storage = require('../storage');
+                
+                // Set Groq as the provider
+                storage.updatePreference('aiProvider', 'groq');
+                console.log('AI Provider set to: groq');
+
+                // Notify renderer to start Groq session
+                sendToRenderer('quick-start-groq');
+                
+            } catch (error) {
+                console.error('Error in quick start Groq:', error);
+            }
+        });
+        console.log(`Registered Quick Start Groq: ${quickStartGroqShortcut}`);
+    } catch (error) {
+        console.error(`Failed to register Quick Start Groq (${quickStartGroqShortcut}):`, error);
+    }
+
+    // Register Kill Switch shortcut (Ctrl+Shift+Delete / Cmd+Shift+Delete)
+    const killSwitchShortcut = isMac ? 'Cmd+Shift+Delete' : 'Ctrl+Shift+Delete';
+    try {
+        globalShortcut.register(killSwitchShortcut, async () => {
+            console.log('=== KILL SWITCH TRIGGERED ===');
+            try {
+                const storage = require('../storage');
+                const { app } = require('electron');
+
+                // Get current session ID from renderer (if exists)
+                mainWindow.webContents.executeJavaScript(`
+                    if (window.cheatingDaddy && window.cheatingDaddy.currentSessionId) {
+                        window.electronbridge?.sendSync?.('kill-switch-export', window.cheatingDaddy.currentSessionId);
+                    }
+                `).catch(err => console.log('Could not get session ID from renderer'));
+
+                // Brief delay to allow export
+                setTimeout(() => {
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.hide();
+                    }
+
+                    // Close any active AI sessions
+                    if (geminiSessionRef.current) {
+                        geminiSessionRef.current.close();
+                        geminiSessionRef.current = null;
+                    }
+
+                    console.log('Exiting application via kill switch');
+                    process.exit(0); // Hard exit - no cleanup needed
+                }, 500);
+                
+            } catch (error) {
+                console.error('Error in kill switch:', error);
+                process.exit(0); // Force exit on error
+            }
+        });
+        console.log(`Registered Kill Switch: ${killSwitchShortcut}`);
+    } catch (error) {
+        console.error(`Failed to register Kill Switch (${killSwitchShortcut}):`, error);
+    }
+
+    // Register Quick Stop shortcut (Alt+S) - stops capture without closing app
+    const quickStopShortcut = 'Alt+S';
+    try {
+        globalShortcut.register(quickStopShortcut, async () => {
+            console.log('=== QUICK STOP SHORTCUT TRIGGERED ===');
+            try {
+                // Send stop signal to renderer to close capture session
+                sendToRenderer('quick-stop');
+                console.log('Quick stop signal sent to renderer');
+            } catch (error) {
+                console.error('Error in quick stop:', error);
+            }
+        });
+        console.log(`Registered Quick Stop: ${quickStopShortcut}`);
+    } catch (error) {
+        console.error(`Failed to register Quick Stop (${quickStopShortcut}):`, error);
     }
 }
 

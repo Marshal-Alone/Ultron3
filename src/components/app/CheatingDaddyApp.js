@@ -105,6 +105,7 @@ export class CheatingDaddyApp extends LitElement {
         selectedScreenshotInterval: { type: String },
         selectedImageQuality: { type: String },
         layoutMode: { type: String },
+        backgroundTransparency: { type: Number },
         _viewInstances: { type: Object, state: true },
         _isClickThrough: { state: true },
         _awaitingNewResponse: { state: true },
@@ -125,6 +126,7 @@ export class CheatingDaddyApp extends LitElement {
         this.selectedScreenshotInterval = '5';
         this.selectedImageQuality = 'medium';
         this.layoutMode = 'normal';
+        this.backgroundTransparency = 0.8;
         this.responses = [];
         this.currentResponseIndex = -1;
         this._viewInstances = new Map();
@@ -149,9 +151,11 @@ export class CheatingDaddyApp extends LitElement {
             this.currentView = config.onboarded ? 'main' : 'onboarding';
 
             // Apply background appearance (color + transparency)
+            const transparency = prefs.backgroundTransparency ?? 0.8;
+            this.backgroundTransparency = transparency;
             this.applyBackgroundAppearance(
                 prefs.backgroundColor ?? '#1e1e1e',
-                prefs.backgroundTransparency ?? 0.8
+                transparency
             );
 
             // Load preferences
@@ -238,6 +242,18 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.on('reconnect-failed', (_, data) => {
                 this.addNewResponse(data.message);
             });
+            ipcRenderer.on('quick-start-groq', () => {
+                console.log('Quick start Groq event received');
+                this.handleQuickStartGroq();
+            });
+            ipcRenderer.on('quick-stop', () => {
+                console.log('Quick stop event received');
+                this.handleQuickStop();
+            });
+            ipcRenderer.on('background-opacity-changed', (_, opacity) => {
+                this.backgroundTransparency = opacity;
+                this.requestUpdate();
+            });
         }
     }
 
@@ -312,6 +328,7 @@ export class CheatingDaddyApp extends LitElement {
                 await ipcRenderer.invoke('close-session');
             }
             this.sessionActive = false;
+            this.isRecording = false;
             this.currentView = 'main';
             console.log('Session closed');
         } else {
@@ -349,7 +366,63 @@ export class CheatingDaddyApp extends LitElement {
         this.responses = [];
         this.currentResponseIndex = -1;
         this.startTime = Date.now();
+        this.isRecording = true;
         this.currentView = 'assistant';
+    }
+
+    // Quick Start Groq - start immediately with Groq provider
+    async handleQuickStartGroq() {
+        console.log('Quick start Groq handler called');
+        
+        // Check if Groq API key exists
+        const groqApiKey = await cheatingDaddy.storage.getGroqApiKey();
+        if (!groqApiKey || groqApiKey.trim() === '') {
+            console.warn('Groq API key not configured for quick start');
+            // Still try to switch to main view and let user see the error
+            this.isRecording = false;
+            this.currentView = 'main';
+            const mainView = this.shadowRoot.querySelector('main-view');
+            if (mainView && mainView.triggerGroqApiKeyError) {
+                mainView.triggerGroqApiKeyError();
+            }
+            return;
+        }
+
+        // Set Groq as provider
+        await cheatingDaddy.storage.updatePreference('aiProvider', 'groq');
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            ipcRenderer.send('ai-provider-changed-notify', 'groq');
+        }
+        
+        // Start the session (same as handleStart but with Groq already selected)
+        await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
+        cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
+        this.responses = [];
+        this.currentResponseIndex = -1;
+        this.startTime = Date.now();
+        this.isRecording = true;
+        this.currentView = 'assistant';
+    }
+
+    // Quick Stop - stop capture and close session immediately
+    async handleQuickStop() {
+        console.log('Quick stop handler called');
+        
+        // If in assistant view, stop capture and close session
+        if (this.currentView === 'assistant') {
+            cheatingDaddy.stopCapture();
+            
+            // Close the session
+            if (window.require) {
+                const { ipcRenderer } = window.require('electron');
+                await ipcRenderer.invoke('close-session');
+            }
+            this.sessionActive = false;
+            this.isRecording = false;
+            this.currentView = 'main';
+            console.log('Session closed via quick stop');
+        }
     }
 
     async handleAPIKeyHelp() {
@@ -489,6 +562,7 @@ export class CheatingDaddyApp extends LitElement {
                         .selectedProfile=${this.selectedProfile}
                         .onSendText=${message => this.handleSendText(message)}
                         .shouldAnimateResponse=${this.shouldAnimateResponse}
+                        .isRecording=${this.isRecording}
                         @response-index-changed=${this.handleResponseIndexChanged}
                         @response-animation-complete=${() => {
                         this.shouldAnimateResponse = false;
@@ -521,6 +595,7 @@ export class CheatingDaddyApp extends LitElement {
                         .currentView=${this.currentView}
                         .statusText=${this.statusText}
                         .startTime=${this.startTime}
+                        .backgroundTransparency=${this.backgroundTransparency}
                         .onCustomizeClick=${() => this.handleCustomizeClick()}
                         .onHelpClick=${() => this.handleHelpClick()}
                         .onHistoryClick=${() => this.handleHistoryClick()}

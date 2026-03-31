@@ -74,6 +74,19 @@ class GroqAIService {
 
             console.log(`Text response completed from Groq ${modelName}`);
 
+            // Save conversation turn to history (Q&A pair)
+            try {
+                const geminiModule = require('./gemini');
+                if (geminiModule.saveConversationTurn && typeof geminiModule.saveConversationTurn === 'function') {
+                    geminiModule.saveConversationTurn(prompt, fullText);
+                    console.log('✅ Conversation turn saved successfully');
+                } else {
+                    console.warn('⚠️ saveConversationTurn function not available in gemini module');
+                }
+            } catch (e) {
+                console.error('❌ Could not save conversation turn to history:', e.message);
+            }
+
             return { success: true, text: fullText, model: `groq-${modelName}` };
         } catch (error) {
             console.error('Groq API error:', error);
@@ -99,7 +112,10 @@ class GroqAIService {
             // Convert raw base64 to data URL format
             const imageUrl = `data:image/jpeg;base64,${base64Data}`;
 
-            console.log(`Sending image to Groq ${modelName} (streaming)...`);
+            console.log('\n[SCREENSHOT] PROMPT SENT TO AI:');
+            console.log('-'.repeat(70));
+            console.log(prompt);
+            console.log('-'.repeat(70) + '\n');
 
             // Use streaming for real-time response display
             const stream = await client.chat.completions.create({
@@ -132,14 +148,49 @@ class GroqAIService {
                 }
             }
 
-            console.log(`Image response completed from Groq ${modelName}`);
+            // Image response received
 
-            // Save screen analysis to history (import saveScreenAnalysis if needed)
+            // Save screen analysis to history
             try {
-                const { saveScreenAnalysis } = require('./gemini');
-                saveScreenAnalysis(prompt, fullText, `groq-${modelName}`);
+                const geminiModule = require('./gemini');
+                if (geminiModule.saveScreenAnalysis && typeof geminiModule.saveScreenAnalysis === 'function') {
+                    geminiModule.saveScreenAnalysis(prompt, fullText, `groq-${modelName}`);
+                    // Screen analysis saved
+                } else {
+                    console.warn('⚠️ saveScreenAnalysis function not available in gemini module');
+                }
             } catch (e) {
-                console.log('Could not save screen analysis to history');
+                console.error('❌ Could not save screen analysis to history:', e.message);
+            }
+
+            // Also save as conversation turn (for Q&A history)
+            try {
+                const geminiModule = require('./gemini');
+                if (geminiModule.saveConversationTurn && typeof geminiModule.saveConversationTurn === 'function') {
+                    geminiModule.saveConversationTurn('Screen Analysis', fullText);
+                    console.log('✅ Screen analysis turn saved to Q&A history');
+                } else {
+                    console.warn('⚠️ saveConversationTurn function not available');
+                }
+            } catch (e) {
+                console.error('❌ Could not save screen analysis turn:', e.message);
+            }
+
+            // Save screenshot image to disk with AI response
+            try {
+                const geminiModule = require('./gemini');
+                const sessionId = geminiModule.getCurrentSessionId ? geminiModule.getCurrentSessionId() : null;
+                if (sessionId) {
+                    const storage = require('../storage');
+                    const result = storage.saveSessionScreenshot(base64Data, sessionId, fullText);
+                    if (result.success) {
+                        // Screenshot saved
+                    } else {
+                        console.warn(`⚠️ Could not save screenshot image: ${result.error}`);
+                    }
+                }
+            } catch (e) {
+                console.error('❌ Could not save screenshot image:', e.message);
             }
 
             return { success: true, text: fullText, model: `groq-${modelName}` };

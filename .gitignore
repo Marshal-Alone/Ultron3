@@ -93,3 +93,6 @@ typings/
 out/
 .specstory
 .specstory/
+
+# Development Reference Documentation
+_REFERENCE/

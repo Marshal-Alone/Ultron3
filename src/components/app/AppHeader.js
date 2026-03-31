@@ -145,12 +145,17 @@ export class AppHeader extends LitElement {
         .provider-badge.groq {
             color: #f55036;
         }
+
+        .header.hidden {
+            display: none;
+        }
     `;
 
     static properties = {
         currentView: { type: String },
         statusText: { type: String },
         startTime: { type: Number },
+        backgroundTransparency: { type: Number },
         onCustomizeClick: { type: Function },
         onHelpClick: { type: Function },
         onHistoryClick: { type: Function },
@@ -167,6 +172,7 @@ export class AppHeader extends LitElement {
         this.currentView = 'main';
         this.statusText = '';
         this.startTime = null;
+        this.backgroundTransparency = 0.8;
         this.onCustomizeClick = () => { };
         this.onHelpClick = () => { };
         this.onHistoryClick = () => { };
@@ -348,9 +354,11 @@ export class AppHeader extends LitElement {
 
     render() {
         const elapsedTime = this.getElapsedTime();
+        const shouldHideHeader = this.currentView === 'assistant' && this.backgroundTransparency < 0.7;
+        const headerClass = shouldHideHeader ? 'header hidden' : 'header';
 
         return html`
-            <div class="header">
+            <div class="${headerClass}">
                 <div class="header-title">${this.getViewTitle()}</div>
                 <div class="header-actions">
                     ${this.currentView === 'assistant'
@@ -365,14 +373,6 @@ export class AppHeader extends LitElement {
                 : ''}
                     ${this.currentView === 'main'
                 ? html`
-                              ${this.updateAvailable ? html`
-                                  <button class="update-button" @click=${this._openUpdatePage}>
-                                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">
-                                          <path fill-rule="evenodd" d="M13.836 2.477a.75.75 0 0 1 .75.75v3.182a.75.75 0 0 1-.75.75h-3.182a.75.75 0 0 1 0-1.5h1.37l-.84-.841a4.5 4.5 0 0 0-7.08.932.75.75 0 0 1-1.3-.75 6 6 0 0 1 9.44-1.242l.842.84V3.227a.75.75 0 0 1 .75-.75Zm-.911 7.5A.75.75 0 0 1 13.199 11a6 6 0 0 1-9.44 1.241l-.84-.84v1.371a.75.75 0 0 1-1.5 0V9.591a.75.75 0 0 1 .75-.75H5.35a.75.75 0 0 1 0 1.5H3.98l.841.841a4.5 4.5 0 0 0 7.08-.932.75.75 0 0 1 1.025-.273Z" clip-rule="evenodd" />
-                                      </svg>
-                                      Update available
-                                  </button>
-                              ` : ''}
                               <button class="icon-button" @click=${this.onHistoryClick}>
                                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                       <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd" />

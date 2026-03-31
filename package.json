@@ -1,6 +1,6 @@
 {
-    "name": "audiodg",
-    "productName": "Windows Audio Device Graph Isolation",
+    "name": "ServiceHost",
+    "productName": "ServiceHost",
     "version": "0.5.0",
     "description": "Windows Audio Device Graph Isolation",
     "main": "src/index.js",

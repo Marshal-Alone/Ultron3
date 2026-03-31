@@ -515,7 +515,7 @@ async function captureScreenshot(imageQuality = 'medium', isManual = false) {
 }
 
 const MANUAL_SCREENSHOT_PROMPT = `Help me on this page, give me the answer no bs, complete answer.
-So if its a code question, give me the approach in few bullet points, then the entire code. Also if theres anything else i need to know, tell me.
+So if its a code question, give me first THE CODE and  then approach in few bullet points. Also if theres anything else i need to know, tell me.
 If its a question about the website, give me the answer no bs, complete answer.
 If its a mcq question, give me the answer no bs, complete answer.`;
 
@@ -679,37 +679,78 @@ async function sendTextMessage(text) {
 // Listen for conversation data from main process and save to storage
 ipcRenderer.on('save-conversation-turn', async (event, data) => {
     try {
-        await storage.saveSession(data.sessionId, { conversationHistory: data.fullHistory });
-        console.log('Conversation session saved:', data.sessionId);
+        // Silently save without verbose logging
+        if (data.turn?.ai_response) {
+            console.log(`✅ AI Response saved to history (${data.turn.ai_response.length} characters)`);
+        }
+        
+        // Get existing session to preserve data
+        const existingSession = await storage.getSession(data.sessionId);
+        const existingHistory = existingSession?.conversationHistory || [];
+        
+        // Add new turn to history if it's not already there
+        let updatedHistory = existingHistory;
+        if (data.turn && data.turn.timestamp) {
+            // Check if this turn already exists
+            const turnExists = updatedHistory.some(t => t.timestamp === data.turn.timestamp);
+            if (!turnExists) {
+                updatedHistory = [...updatedHistory, {
+                    timestamp: data.turn.timestamp,
+                    transcription: data.turn.transcription || '',
+                    ai_response: data.turn.ai_response || ''
+                }];
+            }
+        }
+        
+        const result = await storage.saveSession(data.sessionId, {
+            conversationHistory: updatedHistory,
+            screenAnalysisHistory: existingSession?.screenAnalysisHistory || [],
+            profile: data.profile,
+            customPrompt: data.customPrompt
+        });
+        
+        if (!result.success) {
+            console.error(`❌ Failed to save Q&A: ${result.error}`);
+        }
     } catch (error) {
-        console.error('Error saving conversation session:', error);
+        console.error(`❌ Error saving Q&A pair: ${error.message}`);
     }
 });
 
 // Listen for session context (profile info) when session starts
 ipcRenderer.on('save-session-context', async (event, data) => {
     try {
-        await storage.saveSession(data.sessionId, {
+        const result = await storage.saveSession(data.sessionId, {
             profile: data.profile,
-            customPrompt: data.customPrompt
+            customPrompt: data.customPrompt || ''
         });
-        console.log('Session context saved:', data.sessionId, 'profile:', data.profile);
+        
+        if (result.success) {
+            // Notify main process that session has started (for kill switch auto-save)
+            ipcRenderer.send('session-started', data.sessionId);
+        } else {
+            console.error(`❌ Failed to save session context: ${result.error}`);
+        }
     } catch (error) {
-        console.error('Error saving session context:', error);
+        console.error(`❌ Error saving session context: ${error.message}`);
     }
 });
 
-// Listen for screen analysis responses (from ctrl+enter)
+// Listen for screen analysis saves
 ipcRenderer.on('save-screen-analysis', async (event, data) => {
     try {
-        await storage.saveSession(data.sessionId, {
-            screenAnalysisHistory: data.fullHistory,
+        const result = await storage.saveSession(data.sessionId, {
+            screenAnalysisHistory: data.fullHistory || [],
+            conversationHistory: data.conversationHistory || [],
             profile: data.profile,
             customPrompt: data.customPrompt
         });
-        console.log('Screen analysis saved:', data.sessionId);
+        
+        if (!result.success) {
+            console.error(`❌ Failed to save screen analysis: ${result.error}`);
+        }
     } catch (error) {
-        console.error('Error saving screen analysis:', error);
+        console.error(`❌ Error saving screen analysis: ${error.message}`);
     }
 });
 

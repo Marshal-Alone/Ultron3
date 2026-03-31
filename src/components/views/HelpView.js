@@ -305,6 +305,22 @@ export class HelpView extends LitElement {
                     </div>
                     <div class="keyboard-section">
                         <div class="keyboard-group">
+                            <div class="keyboard-group-title">Quick Controls</div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Quick Start Groq</span>
+                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Shift</span><span class="key">S</span></div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Quick Stop Capture</span>
+                                <div class="shortcut-keys"><span class="key">Alt</span><span class="key">S</span></div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Kill Switch (Close + Save)</span>
+                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Shift</span><span class="key">Delete</span></div>
+                            </div>
+                        </div>
+
+                        <div class="keyboard-group">
                             <div class="keyboard-group-title">Window Movement</div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Move window up</span>

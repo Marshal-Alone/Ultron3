@@ -69,6 +69,13 @@ function initializeNewSession(profile = null, customPrompt = null) {
     currentCustomPrompt = customPrompt;
     console.log('New conversation session started:', currentSessionId, 'profile:', profile);
 
+    // Notify main process to track this session ID
+    try {
+        ipcMain.emit('session-started', { session: { id: currentSessionId } }, currentSessionId);
+    } catch (e) {
+        console.error('Could not notify main process of session start:', e);
+    }
+
     // Save initial session with profile context
     if (profile) {
         sendToRenderer('save-session-context', {
@@ -91,7 +98,6 @@ function saveConversationTurn(transcription, aiResponse) {
     };
 
     conversationHistory.push(conversationTurn);
-    console.log('Saved conversation turn:', conversationTurn);
 
     // Send to renderer to save in IndexedDB
     sendToRenderer('save-conversation-turn', {
@@ -114,7 +120,6 @@ function saveScreenAnalysis(prompt, response, model) {
     };
 
     screenAnalysisHistory.push(analysisEntry);
-    console.log('Saved screen analysis:', analysisEntry);
 
     // Send to renderer to save
     sendToRenderer('save-screen-analysis', {
@@ -131,6 +136,10 @@ function getCurrentSessionData() {
         sessionId: currentSessionId,
         history: conversationHistory,
     };
+}
+
+function getCurrentSessionId() {
+    return currentSessionId;
 }
 
 async function getEnabledTools() {
@@ -575,7 +584,10 @@ async function sendImageToGeminiHttp(base64Data, prompt) {
             { text: prompt },
         ];
 
-        console.log(`Sending image to ${model} (streaming)...`);
+        console.log('\n[SCREENSHOT] PROMPT SENT TO AI:');
+        console.log('-'.repeat(70));
+        console.log(prompt);
+        console.log('-'.repeat(70) + '\n');
         const response = await ai.models.generateContentStream({
             model: model,
             contents: contents,
@@ -597,10 +609,26 @@ async function sendImageToGeminiHttp(base64Data, prompt) {
             }
         }
 
-        console.log(`Image response completed from ${model}`);
+        // Image response received
 
         // Save screen analysis to history
         saveScreenAnalysis(prompt, fullText, model);
+
+        // Save screenshot image to disk with AI response
+        try {
+            const sessionId = getCurrentSessionId();
+            if (sessionId) {
+                const storage = require('../storage');
+                const result = storage.saveSessionScreenshot(base64Data, sessionId, fullText);
+                if (result.success) {
+                    // Screenshot saved
+                } else {
+                    console.warn(`⚠️ Could not save screenshot image: ${result.error}`);
+                }
+            }
+        } catch (e) {
+            console.error('❌ Could not save screenshot image:', e.message);
+        }
 
         return { success: true, text: fullText, model: model };
     } catch (error) {
@@ -615,12 +643,27 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     global.geminiSessionRef = geminiSessionRef;
 
     ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US') => {
-        const session = await initializeGeminiSession(apiKey, customPrompt, profile, language);
-        if (session) {
-            geminiSessionRef.current = session;
+        // Check which AI provider is selected
+        const { getPreferences } = require('../storage');
+        const prefs = getPreferences();
+        const provider = prefs.aiProvider || 'gemini';
+
+        console.log('initialize-gemini called with provider:', provider);
+
+        if (provider === 'groq') {
+            // For Groq, we don't need a WebSocket session - just initialize the session tracking
+            console.log('Initializing Groq session (HTTP-based)');
+            initializeNewSession(profile, customPrompt);
             return true;
+        } else {
+            // For Gemini, create the realtime session
+            const session = await initializeGeminiSession(apiKey, customPrompt, profile, language);
+            if (session) {
+                geminiSessionRef.current = session;
+                return true;
+            }
+            return false;
         }
-        return false;
     });
 
     ipcMain.handle('send-audio-content', async (event, { data, mimeType }) => {
@@ -811,6 +854,7 @@ module.exports = {
     initializeNewSession,
     saveConversationTurn,
     getCurrentSessionData,
+    getCurrentSessionId,
     killExistingSystemAudioDump,
     startMacOSAudioCapture,
     convertStereoToMono,
@@ -819,4 +863,5 @@ module.exports = {
     sendImageToGeminiHttp,
     setupGeminiIpcHandlers,
     formatSpeakerResults,
+    saveScreenAnalysis,
 };

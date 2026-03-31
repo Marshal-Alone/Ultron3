@@ -9,6 +9,7 @@ const storage = require('./storage');
 
 const geminiSessionRef = { current: null };
 let mainWindow = null;
+let currentSessionId = null;
 
 function createMainWindow() {
     mainWindow = createWindow(sendToRenderer, geminiSessionRef);
@@ -32,7 +33,35 @@ app.on('window-all-closed', () => {
     }
 });
 
-app.on('before-quit', () => {
+// Auto-save session when app is about to quit
+app.on('before-quit', async (event) => {
+    console.log('=== APP QUIT - AUTO-SAVING SESSION ===');
+    
+    try {
+        if (currentSessionId) {
+            console.log(`Attempting to save session: ${currentSessionId}`);
+            const session = storage.getSession(currentSessionId);
+            console.log(`Retrieved session:`, session);
+            
+            if (session && (session.conversationHistory?.length > 0 || session.screenAnalysisHistory?.length > 0)) {
+                const result = storage.exportSessionToDownloads(currentSessionId);
+                if (result.success) {
+                    console.log(`✅ Session auto-saved successfully`);
+                    console.log(`Files saved:`, result.filepaths);
+                } else {
+                    console.error('❌ Failed to auto-save session:', result.error);
+                }
+            } else {
+                console.log('⚠️ Session is empty, skipping export');
+            }
+        } else {
+            console.log('⚠️ No active session to save');
+        }
+    } catch (error) {
+        console.error('❌ Error during app quit auto-save:', error);
+    }
+    
+    // Stop audio capture
     stopMacOSAudioCapture();
 });
 
@@ -295,5 +324,37 @@ function setupGeneralIpcHandlers() {
     // Debug logging from renderer
     ipcMain.on('log-message', (event, msg) => {
         console.log(msg);
+    });
+
+    // ============ QUICK START & KILL SWITCH ============
+
+    // Track current session ID from renderer (set when session starts)
+    ipcMain.on('session-started', (event, sessionId) => {
+        currentSessionId = sessionId;
+        console.log('Current session tracked:', sessionId);
+    });
+
+    // Handle kill switch export request
+    ipcMain.on('kill-switch-export', (event, sessionId) => {
+        if (sessionId) {
+            console.log('Kill switch export requested for session:', sessionId);
+            const result = storage.exportSessionToDownloads(sessionId);
+            if (result.success) {
+                console.log(`Session exported via kill switch: ${result.filepath}`);
+            }
+        }
+    });
+
+    // Handle quick start Groq request from main process (sent via shortcut)
+    ipcMain.on('trigger-quick-start-groq', (event) => {
+        console.log('Quick start Groq triggered via IPC');
+        // The shortcut handler already sent 'quick-start-groq' to renderer
+        // This is just for additional cleanup if needed
+    });
+
+    // Handle quick stop request from main process (sent via shortcut)
+    ipcMain.on('trigger-quick-stop', (event) => {
+        console.log('Quick stop triggered via IPC');
+        // The shortcut handler already sent 'quick-stop' to renderer
     });
 }

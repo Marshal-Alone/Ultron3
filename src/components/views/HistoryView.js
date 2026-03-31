@@ -349,6 +349,117 @@ export class HistoryView extends LitElement {
             background: rgba(241, 76, 76, 0.1);
             color: var(--error-color);
         }
+
+        .screenshot-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            padding: 12px;
+        }
+
+        .screenshot-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: border-color 0.1s ease;
+        }
+
+        .screenshot-item:hover {
+            border-color: var(--text-secondary);
+        }
+
+        .screenshot-image {
+            width: 100%;
+            max-height: 150px;
+            object-fit: cover;
+            background: #000;
+        }
+
+        .screenshot-info {
+            padding: 8px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .screenshot-timestamp {
+            font-size: 10px;
+            color: var(--text-muted);
+            font-family: 'SF Mono', Monaco, monospace;
+            margin-bottom: 4px;
+        }
+
+        .screenshot-response {
+            font-size: 11px;
+            color: var(--text-color);
+            line-height: 1.3;
+            max-height: 60px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        .screenshot-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .screenshot-modal-content {
+            background: var(--bg-primary);
+            border-radius: 8px;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow: auto;
+            padding: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .screenshot-modal-image {
+            max-width: 100%;
+            max-height: 70vh;
+            object-fit: contain;
+            margin-bottom: 12px;
+            border-radius: 4px;
+        }
+
+        .screenshot-modal-response {
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--text-color);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .screenshot-modal-close {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--bg-secondary);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 3px;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.1s ease;
+        }
+
+        .screenshot-modal-close:hover {
+            background: var(--hover-background);
+        }
     `;
 
     static properties = {
@@ -356,6 +467,7 @@ export class HistoryView extends LitElement {
         selectedSession: { type: Object },
         loading: { type: Boolean },
         activeTab: { type: String },
+        selectedScreenshot: { type: Object },
     };
 
     constructor() {
@@ -363,7 +475,8 @@ export class HistoryView extends LitElement {
         this.sessions = [];
         this.selectedSession = null;
         this.loading = true;
-        this.activeTab = 'conversation'; // 'conversation' or 'screen'
+        this.activeTab = 'conversation'; // 'conversation', 'screen', or 'context'
+        this.selectedScreenshot = null;
         this.loadSessions();
     }
 
@@ -453,6 +566,47 @@ export class HistoryView extends LitElement {
         this.activeTab = tab;
     }
 
+    async handleClearHistory() {
+        const confirmed = confirm(
+            '⚠️ Clear all conversation history?\n\n' +
+            'This will permanently delete all saved conversations and cannot be undone.\n\n' +
+            'Type "DELETE" to confirm:'
+        );
+        
+        if (!confirmed) return;
+        
+        // Ask for confirmation by typing DELETE
+        const userInput = prompt('Type "DELETE" to permanently clear all history:');
+        if (userInput !== 'DELETE') {
+            alert('Cancelled. History was not cleared.');
+            return;
+        }
+
+        try {
+            // Call the ipcRenderer to delete all sessions
+            const result = await cheatingDaddy.ipcRenderer.invoke('storage:delete-all-sessions');
+            if (result.success) {
+                // Reload sessions after clearing
+                await this.loadSessions();
+                this.selectedSession = null;
+                alert('Check mark All conversation history has been cleared.');
+            } else {
+                alert('Cross mark Failed to clear history: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error clearing history:', error);
+            alert('Failed to clear history. Please try again.');
+        }
+    }
+
+    handleScreenshotClick(screenshot) {
+        this.selectedScreenshot = screenshot;
+    }
+
+    handleCloseScreenshot() {
+        this.selectedScreenshot = null;
+    }
+
     getProfileNames() {
         return {
             interview: 'Job Interview',
@@ -479,18 +633,32 @@ export class HistoryView extends LitElement {
         }
 
         return html`
-            <div class="sessions-list">
-                ${this.sessions.map(
-                    session => html`
-                        <div class="session-item" @click=${() => this.handleSessionClick(session)}>
-                            <div class="session-header">
-                                <div class="session-date">${this.formatDate(session.createdAt)}</div>
-                                <div class="session-time">${this.formatTime(session.createdAt)}</div>
+            <div class="history-container" style="display: flex; flex-direction: column; height: 100%;">
+                <div style="padding: 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-weight: 500; color: var(--text-color);">Conversation History</div>
+                    ${this.sessions.length > 0 ? html`
+                        <button 
+                            class="back-button" 
+                            @click=${() => this.handleClearHistory()}
+                            style="background: rgba(241, 76, 76, 0.1); color: var(--error-color); border-color: var(--error-color);"
+                        >
+                            Clear All
+                        </button>
+                    ` : ''}
+                </div>
+                <div class="sessions-list" style="flex: 1; overflow-y: auto;">
+                    ${this.sessions.map(
+                        session => html`
+                            <div class="session-item" @click=${() => this.handleSessionClick(session)}>
+                                <div class="session-header">
+                                    <div class="session-date">${this.formatDate(session.createdAt)}</div>
+                                    <div class="session-time">${this.formatTime(session.createdAt)}</div>
+                                </div>
+                                <div class="session-preview">${this.getSessionPreview(session)}</div>
                             </div>
-                            <div class="session-preview">${this.getSessionPreview(session)}</div>
-                        </div>
-                    `
-                )}
+                        `
+                    )}
+                </div>
             </div>
         `;
     }
@@ -553,23 +721,35 @@ export class HistoryView extends LitElement {
     }
 
     renderScreenAnalysisContent() {
-        const { screenAnalysisHistory } = this.selectedSession;
+        const { screenshotReferences } = this.selectedSession;
 
-        if (!screenAnalysisHistory || screenAnalysisHistory.length === 0) {
-            return html`<div class="empty-state">No screen analysis data available</div>`;
+        if (!screenshotReferences || screenshotReferences.length === 0) {
+            return html`<div class="empty-state">No screenshots available</div>`;
         }
 
-        return screenAnalysisHistory.map(analysis => html`
-            <div class="message screen"><div class="analysis-meta">${this.formatTimestamp(analysis.timestamp)} • ${analysis.model || 'unknown model'}</div>${analysis.response}</div>
-        `);
+        return html`
+            <div class="screenshot-gallery">
+                ${screenshotReferences.map(screenshot => html`
+                    <div class="screenshot-item" @click=${() => this.handleScreenshotClick(screenshot)}>
+                        <img class="screenshot-image" src="data:image/png;base64,${screenshot.base64Data}" alt="Screenshot" />
+                        <div class="screenshot-info">
+                            <div class="screenshot-timestamp">${this.formatTimestamp(screenshot.timestamp)}</div>
+                            ${screenshot.aiResponse ? html`
+                                <div class="screenshot-response">${screenshot.aiResponse}</div>
+                            ` : html`<div class="screenshot-response" style="color: var(--text-muted);">No response</div>`}
+                        </div>
+                    </div>
+                `)}
+            </div>
+        `;
     }
 
     renderConversationView() {
         if (!this.selectedSession) return html``;
 
-        const { conversationHistory, screenAnalysisHistory, profile, customPrompt } = this.selectedSession;
+        const { conversationHistory, screenshotReferences, profile, customPrompt } = this.selectedSession;
         const hasConversation = conversationHistory && conversationHistory.length > 0;
-        const hasScreenAnalysis = screenAnalysisHistory && screenAnalysisHistory.length > 0;
+        const hasScreenshots = screenshotReferences && screenshotReferences.length > 0;
         const hasContext = profile || customPrompt;
 
         return html`
@@ -614,7 +794,7 @@ export class HistoryView extends LitElement {
                     class="view-tab ${this.activeTab === 'screen' ? 'active' : ''}"
                     @click=${() => this.handleTabClick('screen')}
                 >
-                    Screen ${hasScreenAnalysis ? `(${screenAnalysisHistory.length})` : ''}
+                    Screen ${hasScreenshots ? `(${screenshotReferences.length})` : ''}
                 </button>
                 <button
                     class="view-tab ${this.activeTab === 'context' ? 'active' : ''}"
@@ -634,6 +814,25 @@ export class HistoryView extends LitElement {
     }
 
     render() {
+        if (this.selectedScreenshot) {
+            return html`
+                <div class="screenshot-modal" @click=${this.handleCloseScreenshot}>
+                    <button class="screenshot-modal-close" @click=${this.handleCloseScreenshot}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                    <div class="screenshot-modal-content" @click=${e => e.stopPropagation()}>
+                        <img class="screenshot-modal-image" src="data:image/png;base64,${this.selectedScreenshot.base64Data}" alt="Screenshot" />
+                        ${this.selectedScreenshot.aiResponse ? html`
+                            <div class="screenshot-modal-response">${this.selectedScreenshot.aiResponse}</div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
         if (this.selectedSession) {
             return html`<div class="history-container">${this.renderConversationView()}</div>`;
         }
