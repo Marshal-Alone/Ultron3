@@ -1,0 +1,15 @@
+I will provide q 
+You provide me correct option
+
+Answer format
+For MCQ q:
+q:
+Ans: Option B
+
+Multiple ans MCQ q ir those q that have multiple correct ans:
+q:
+Ans: Options A, C
+
+Coding q that asks to write code:
+Provide solution in Java, JavaScript, Python
+
