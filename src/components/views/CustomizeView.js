@@ -924,80 +924,140 @@ export class CustomizeView extends LitElement {
 
     getKeybindActions() {
         return [
+            // Main Shortcuts (Quick Controls)
+            {
+                key: 'quickStartGroq',
+                name: 'Quick Start Groq',
+                description: 'Immediately start Groq conversation capture',
+                category: 'main',
+            },
+            {
+                key: 'quickStop',
+                name: 'Quick Stop',
+                description: 'Stop current capture and close session',
+                category: 'main',
+            },
+            {
+                key: 'killSwitch',
+                name: 'Kill Switch',
+                description: 'Force close app with auto-save',
+                category: 'main',
+            },
+            // Window Resizing
+            {
+                key: 'increaseWidth',
+                name: 'Increase Window Width',
+                description: 'Increase window width by 50px',
+                category: 'resizing',
+            },
+            {
+                key: 'decreaseWidth',
+                name: 'Decrease Window Width',
+                description: 'Decrease window width by 50px',
+                category: 'resizing',
+            },
+            {
+                key: 'increaseHeight',
+                name: 'Increase Window Height',
+                description: 'Increase window height by 50px',
+                category: 'resizing',
+            },
+            {
+                key: 'decreaseHeight',
+                name: 'Decrease Window Height',
+                description: 'Decrease window height by 50px',
+                category: 'resizing',
+            },
+            // Window Control
             {
                 key: 'moveUp',
                 name: 'Move Window Up',
                 description: 'Move the application window up',
+                category: 'window',
             },
             {
                 key: 'moveDown',
                 name: 'Move Window Down',
                 description: 'Move the application window down',
+                category: 'window',
             },
             {
                 key: 'moveLeft',
                 name: 'Move Window Left',
                 description: 'Move the application window left',
+                category: 'window',
             },
             {
                 key: 'moveRight',
                 name: 'Move Window Right',
                 description: 'Move the application window right',
+                category: 'window',
             },
             {
                 key: 'toggleVisibility',
                 name: 'Toggle Window Visibility',
                 description: 'Show/hide the application window',
+                category: 'window',
             },
             {
                 key: 'toggleClickThrough',
                 name: 'Toggle Click-through Mode',
                 description: 'Enable/disable click-through functionality',
+                category: 'window',
             },
             {
                 key: 'nextStep',
                 name: 'Ask Next Step',
                 description: 'Take screenshot and ask AI for the next step suggestion',
+                category: 'ai',
             },
             {
                 key: 'previousResponse',
                 name: 'Previous Response',
                 description: 'Navigate to the previous AI response',
+                category: 'ai',
             },
             {
                 key: 'nextResponse',
                 name: 'Next Response',
                 description: 'Navigate to the next AI response',
+                category: 'ai',
             },
             {
                 key: 'scrollUp',
                 name: 'Scroll Response Up',
                 description: 'Scroll the AI response content up',
+                category: 'ai',
             },
             {
                 key: 'scrollDown',
                 name: 'Scroll Response Down',
                 description: 'Scroll the AI response content down',
+                category: 'ai',
             },
             {
                 key: 'decreaseTransparency',
                 name: 'Decrease Transparency',
                 description: 'Make background more transparent',
+                category: 'appearance',
             },
             {
                 key: 'increaseTransparency',
                 name: 'Increase Transparency',
                 description: 'Make background more opaque',
+                category: 'appearance',
             },
             {
                 key: 'decreaseFontSize',
                 name: 'Decrease Font Size',
                 description: 'Make response text smaller',
+                category: 'appearance',
             },
             {
                 key: 'increaseFontSize',
                 name: 'Increase Font Size',
                 description: 'Make response text larger',
+                category: 'appearance',
             },
             // {
             //     key: 'askClipboard',
@@ -1408,9 +1468,16 @@ export class CustomizeView extends LitElement {
     }
 
     renderKeyboardSection() {
-        return html`
-            <div class="content-header">Keyboard Shortcuts</div>
-            <div class="form-grid">
+        const allActions = this.getKeybindActions();
+        
+        // Categorize shortcuts
+        const mainActions = allActions.filter(a => a.category === 'main');
+        const resizingActions = allActions.filter(a => a.category === 'resizing');
+        const otherActions = allActions.filter(a => !a.category || (a.category !== 'main' && a.category !== 'resizing'));
+        
+        const renderShortcutsTable = (actions, title) => html`
+            <div class="shortcuts-section">
+                <h3>${title}</h3>
                 <table class="keybinds-table">
                     <thead>
                         <tr>
@@ -1419,7 +1486,7 @@ export class CustomizeView extends LitElement {
                         </tr>
                     </thead>
                     <tbody>
-                        ${this.getKeybindActions().map(
+                        ${actions.map(
             action => html`
                                 <tr>
                                     <td>
@@ -1444,13 +1511,26 @@ export class CustomizeView extends LitElement {
                                 </tr>
                             `
         )}
-                        <tr class="table-reset-row">
-                            <td colspan="2">
-                                <button class="reset-keybinds-button" @click=${this.resetKeybinds}>Reset to Defaults</button>
-                            </td>
-                        </tr>
                     </tbody>
                 </table>
+            </div>
+        `;
+        
+        return html`
+            <div class="content-header">Keyboard Shortcuts</div>
+            <div class="form-grid">
+                <!-- Main Shortcuts (Top) -->
+                ${mainActions.length > 0 ? renderShortcutsTable(mainActions, 'Main Shortcuts (Quick Controls)') : ''}
+                
+                <!-- Window Resizing -->
+                ${resizingActions.length > 0 ? renderShortcutsTable(resizingActions, 'Window Resizing') : ''}
+                
+                <!-- Other Shortcuts (Bottom) -->
+                ${otherActions.length > 0 ? renderShortcutsTable(otherActions, 'Other Shortcuts') : ''}
+                
+                <div class="reset-section">
+                    <button class="reset-keybinds-button" @click=${this.resetKeybinds}>Reset All to Defaults</button>
+                </div>
             </div>
         `;
     }
