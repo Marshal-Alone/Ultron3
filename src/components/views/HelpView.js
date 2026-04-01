@@ -377,6 +377,34 @@ export class HelpView extends LitElement {
                         </div>
 
                         <div class="keyboard-group">
+                            <div class="keyboard-group-title">Display & Appearance</div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Decrease background opacity</span>
+                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Alt</span><span class="key">9</span></div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Increase background opacity</span>
+                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Alt</span><span class="key">0</span></div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Decrease text opacity</span>
+                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Shift</span><span class="key">9</span></div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Increase text opacity</span>
+                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Shift</span><span class="key">0</span></div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Decrease font size</span>
+                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Alt</span><span class="key">[</span></div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Increase font size</span>
+                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Alt</span><span class="key">]</span></div>
+                            </div>
+                        </div>
+
+                        <div class="keyboard-group">
                             <div class="keyboard-group-title">AI Actions</div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Take screenshot and ask for next step</span>

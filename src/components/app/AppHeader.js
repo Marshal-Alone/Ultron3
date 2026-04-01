@@ -148,6 +148,7 @@ export class AppHeader extends LitElement {
 
         .header.hidden {
             display: none;
+            border: none;
         }
     `;
 

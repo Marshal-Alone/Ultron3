@@ -800,6 +800,24 @@ ipcRenderer.on('adjust-font-size', async (event, delta) => {
     }
 });
 
+// Listen for text opacity adjustment shortcuts
+ipcRenderer.on('adjust-text-opacity', async (event, delta) => {
+    console.log('Adjusting text opacity by:', delta);
+    try {
+        const prefs = await storage.getPreferences();
+        let newOpacity = (prefs.textOpacity ?? 1) + delta;
+        newOpacity = Math.max(0, Math.min(1, newOpacity)); // Clamp between 0 and 1
+        await storage.updatePreference('textOpacity', newOpacity);
+
+        // Apply immediately
+        document.documentElement.style.setProperty('--text-opacity', newOpacity);
+
+        console.log('Text opacity set to:', newOpacity);
+    } catch (error) {
+        console.error('Error adjusting text opacity:', error);
+    }
+});
+
 // Listen for Stealth Paste (clipboard ask)
 ipcRenderer.on('clipboard-query', (event, text) => {
     console.log('Received clipboard query via IPC');

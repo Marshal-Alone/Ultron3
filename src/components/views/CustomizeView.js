@@ -557,6 +557,7 @@ export class CustomizeView extends LitElement {
         keybinds: { type: Object },
         googleSearchEnabled: { type: Boolean },
         backgroundTransparency: { type: Number },
+        textOpacity: { type: Number },
         fontSize: { type: Number },
         theme: { type: String },
         onProfileChange: { type: Function },
@@ -593,6 +594,9 @@ export class CustomizeView extends LitElement {
 
         // Background transparency default
         this.backgroundTransparency = 0.8;
+
+        // Text opacity default
+        this.textOpacity = 1;
 
         // Font size default (in pixels)
         this.fontSize = 20;
@@ -703,6 +707,7 @@ export class CustomizeView extends LitElement {
 
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
             this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
+            this.textOpacity = prefs.textOpacity ?? 1;
             this.fontSize = prefs.fontSize ?? 20;
             this.audioMode = prefs.audioMode ?? 'speaker_only';
             this.customPrompt = prefs.customPrompt ?? '';
@@ -902,6 +907,8 @@ export class CustomizeView extends LitElement {
             // Appearance
             decreaseTransparency: isMac ? 'Cmd+Alt+9' : 'Ctrl+Alt+9',
             increaseTransparency: isMac ? 'Cmd+Alt+0' : 'Ctrl+Alt+0',
+            decreaseTextOpacity: isMac ? 'Cmd+Shift+9' : 'Ctrl+Shift+9',
+            increaseTextOpacity: isMac ? 'Cmd+Shift+0' : 'Ctrl+Shift+0',
             decreaseFontSize: isMac ? 'Cmd+Alt+[' : 'Ctrl+Alt+[',
             increaseFontSize: isMac ? 'Cmd+Alt+]' : 'Ctrl+Alt+]',
             // Other
@@ -1058,6 +1065,18 @@ export class CustomizeView extends LitElement {
                 key: 'increaseTransparency',
                 name: 'Increase Transparency',
                 description: 'Make background more opaque',
+                category: 'appearance',
+            },
+            {
+                key: 'decreaseTextOpacity',
+                name: 'Decrease Text Opacity',
+                description: 'Make text more transparent/less visible',
+                category: 'appearance',
+            },
+            {
+                key: 'increaseTextOpacity',
+                name: 'Increase Text Opacity',
+                description: 'Make text more opaque/fully visible',
                 category: 'appearance',
             },
             {
@@ -1257,6 +1276,14 @@ export class CustomizeView extends LitElement {
         cheatingDaddy.theme.applyBackgrounds(colors.background, this.backgroundTransparency);
     }
 
+    async handleTextOpacityChange(e) {
+        this.textOpacity = parseFloat(e.target.value);
+        await cheatingDaddy.storage.updatePreference('textOpacity', this.textOpacity);
+        // Apply immediately
+        document.documentElement.style.setProperty('--text-opacity', this.textOpacity);
+        this.requestUpdate();
+    }
+
     // Keep old function name for backwards compatibility
     updateBackgroundTransparency() {
         this.updateBackgroundAppearance();
@@ -1424,6 +1451,28 @@ export class CustomizeView extends LitElement {
                         <div class="slider-labels">
                             <span>Transparent</span>
                             <span>Opaque</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <label class="form-label">Text Opacity</label>
+                            <span class="slider-value">${Math.round(this.textOpacity * 100)}%</span>
+                        </div>
+                        <input
+                            type="range"
+                            class="slider-input"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            .value=${this.textOpacity}
+                            @input=${this.handleTextOpacityChange}
+                        />
+                        <div class="slider-labels">
+                            <span>Invisible</span>
+                            <span>Fully Visible</span>
                         </div>
                     </div>
                 </div>

@@ -151,6 +151,8 @@ function getDefaultKeybinds() {
         askClipboard: isMac ? 'Cmd+Alt+P' : 'Ctrl+Alt+P',
         toggleStealth: isMac ? 'Cmd+Alt+L' : 'Ctrl+Alt+L',
         toggleNavbar: isMac ? 'Cmd+Alt+N' : 'Ctrl+Alt+N',
+        decreaseTextOpacity: isMac ? 'Cmd+Shift+9' : 'Ctrl+Shift+9',
+        increaseTextOpacity: isMac ? 'Cmd+Shift+0' : 'Ctrl+Shift+0',
         quickStartGroq: isMac ? 'Cmd+Shift+S' : 'Ctrl+Shift+S',
         quickStop: 'Alt+S',
         killSwitch: isMac ? 'Cmd+Shift+Delete' : 'Ctrl+Shift+Delete',
@@ -463,6 +465,35 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             console.log(`Registered increaseFontSize: ${keybinds.increaseFontSize}`);
         } catch (error) {
             console.error(`Failed to register increaseFontSize:`, error);
+        }
+    }
+
+    // Register text opacity adjustment shortcuts
+    if (keybinds.decreaseTextOpacity) {
+        try {
+            globalShortcut.register(keybinds.decreaseTextOpacity, () => {
+                console.log('Decrease text opacity shortcut triggered');
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('adjust-text-opacity', -0.1);
+                }
+            });
+            console.log(`Registered decreaseTextOpacity: ${keybinds.decreaseTextOpacity}`);
+        } catch (error) {
+            console.error(`Failed to register decreaseTextOpacity:`, error);
+        }
+    }
+
+    if (keybinds.increaseTextOpacity) {
+        try {
+            globalShortcut.register(keybinds.increaseTextOpacity, () => {
+                console.log('Increase text opacity shortcut triggered');
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('adjust-text-opacity', 0.1);
+                }
+            });
+            console.log(`Registered increaseTextOpacity: ${keybinds.increaseTextOpacity}`);
+        } catch (error) {
+            console.error(`Failed to register increaseTextOpacity:`, error);
         }
     }
 

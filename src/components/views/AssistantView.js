@@ -31,6 +31,7 @@ export class AssistantView extends LitElement {
             scroll-behavior: smooth;
             user-select: text;
             cursor: text;
+            opacity: var(--text-opacity, 1);
         }
 
         .response-container * {
@@ -361,6 +362,16 @@ export class AssistantView extends LitElement {
             font-size: 10px;
             margin-left: 4px;
         }
+
+        /* Hidden navbar styles */
+        .response-wrapper.navbar-hidden {
+            height: 100%;
+        }
+
+        .response-wrapper.navbar-hidden .response-container::-webkit-scrollbar {
+            width: 0;
+            display: none;
+        }
     `;
 
     static properties = {
@@ -373,6 +384,8 @@ export class AssistantView extends LitElement {
         flashLiteCount: { type: Number },
         aiProvider: { type: String },
         isRecording: { type: Boolean },
+        isNavbarHidden: { type: Boolean },
+        backgroundTransparency: { type: Number },
     };
 
     constructor() {
@@ -385,6 +398,8 @@ export class AssistantView extends LitElement {
         this.flashLiteCount = 0;
         this.aiProvider = 'gemini';
         this.isRecording = false;
+        this.isNavbarHidden = false;
+        this.backgroundTransparency = 0.8;
         this.loadAiProvider();
     }
 
@@ -671,9 +686,10 @@ export class AssistantView extends LitElement {
 
     render() {
         const responseCounter = this.getResponseCounter();
+        const responseWrapperClass = this.isNavbarHidden ? 'response-wrapper navbar-hidden' : 'response-wrapper';
 
         return html`
-            <div class="response-wrapper">
+            <div class="${responseWrapperClass}">
                 <div class="response-container" id="responseContainer"></div>
             </div>
 

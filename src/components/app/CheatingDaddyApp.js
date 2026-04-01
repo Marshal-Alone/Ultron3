@@ -53,6 +53,11 @@ export class CheatingDaddyApp extends LitElement {
             padding: 12px;
         }
 
+        .main-content.assistant-view.navbar-hidden {
+            padding: 0;
+            border: none;
+        }
+
         .main-content.onboarding-view {
             padding: 0;
             background: transparent;
@@ -160,6 +165,10 @@ export class CheatingDaddyApp extends LitElement {
                 transparency
             );
 
+            // Apply text opacity
+            const textOpacity = prefs.textOpacity ?? 1;
+            document.documentElement.style.setProperty('--text-opacity', textOpacity);
+
             // Load preferences
             this.selectedProfile = prefs.selectedProfile || 'interview';
             this.selectedLanguage = prefs.selectedLanguage || 'en-US';
@@ -213,6 +222,7 @@ export class CheatingDaddyApp extends LitElement {
         root.style.setProperty('--input-focus-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
         root.style.setProperty('--hover-background', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
         root.style.setProperty('--scrollbar-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
+        root.style.setProperty('--text-opacity', alpha);
     }
 
     // Keep old function name for backwards compatibility
@@ -569,6 +579,8 @@ export class CheatingDaddyApp extends LitElement {
                         .onSendText=${message => this.handleSendText(message)}
                         .shouldAnimateResponse=${this.shouldAnimateResponse}
                         .isRecording=${this.isRecording}
+                        .isNavbarHidden=${this.isNavbarHidden}
+                        .backgroundTransparency=${this.backgroundTransparency}
                         @response-index-changed=${this.handleResponseIndexChanged}
                         @response-animation-complete=${() => {
                         this.shouldAnimateResponse = false;
@@ -592,7 +604,8 @@ export class CheatingDaddyApp extends LitElement {
             'help': 'help-view',
             'history': 'history-view',
         };
-        const mainContentClass = `main-content ${viewClassMap[this.currentView] || 'with-border'}`;
+        const navbarHiddenClass = this.isNavbarHidden && this.currentView === 'assistant' ? 'navbar-hidden' : '';
+        const mainContentClass = `main-content ${viewClassMap[this.currentView] || 'with-border'} ${navbarHiddenClass}`.trim();
 
         return html`
             <div class="window-container">
