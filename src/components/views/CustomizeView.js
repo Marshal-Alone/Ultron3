@@ -877,21 +877,34 @@ export class CustomizeView extends LitElement {
     getDefaultKeybinds() {
         const isMac = cheatingDaddy.isMacOS || navigator.platform.includes('Mac');
         return {
+            // Main shortcuts (Quick Controls)
+            quickStartGroq: isMac ? 'Cmd+Shift+S' : 'Ctrl+Shift+S',
+            quickStop: isMac ? 'Alt+S' : 'Alt+S',
+            killSwitch: isMac ? 'Cmd+Shift+Delete' : 'Ctrl+Shift+Delete',
+            // Window resizing
+            increaseWidth: isMac ? 'Cmd+Shift+Right' : 'Ctrl+Shift+Right',
+            decreaseWidth: isMac ? 'Cmd+Shift+Left' : 'Ctrl+Shift+Left',
+            increaseHeight: isMac ? 'Cmd+Alt+Up' : 'Ctrl+Alt+Up',
+            decreaseHeight: isMac ? 'Cmd+Alt+Down' : 'Ctrl+Alt+Down',
+            // Window control
             moveUp: isMac ? 'Alt+Up' : 'Ctrl+Up',
             moveDown: isMac ? 'Alt+Down' : 'Ctrl+Down',
             moveLeft: isMac ? 'Alt+Left' : 'Ctrl+Left',
             moveRight: isMac ? 'Alt+Right' : 'Ctrl+Right',
             toggleVisibility: isMac ? 'Cmd+\\' : 'Ctrl+\\',
             toggleClickThrough: isMac ? 'Cmd+M' : 'Ctrl+M',
+            // AI actions
             nextStep: isMac ? 'Cmd+Enter' : 'Ctrl+Enter',
             previousResponse: isMac ? 'Cmd+[' : 'Ctrl+[',
             nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
             scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
             scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
+            // Appearance
             decreaseTransparency: isMac ? 'Cmd+Alt+9' : 'Ctrl+Alt+9',
             increaseTransparency: isMac ? 'Cmd+Alt+0' : 'Ctrl+Alt+0',
             decreaseFontSize: isMac ? 'Cmd+Alt+[' : 'Ctrl+Alt+[',
             increaseFontSize: isMac ? 'Cmd+Alt+]' : 'Ctrl+Alt+]',
+            // Other
             askClipboard: isMac ? 'Cmd+Alt+P' : 'Ctrl+Alt+P',
             toggleStealth: isMac ? 'Cmd+Alt+L' : 'Ctrl+Alt+L',
         };

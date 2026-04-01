@@ -145,8 +145,10 @@ function resetConfigDir() {
 
 // Initialize storage - call this on app startup
 function initializeStorage() {
-    // Always reset config directory on startup to clear any stale preferences
-    resetConfigDir();
+    // Only reset if needed (version mismatch or no config exists)
+    if (needsReset()) {
+        resetConfigDir();
+    }
 }
 
 // ============ CONFIG ============
