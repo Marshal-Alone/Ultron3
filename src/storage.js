@@ -24,7 +24,7 @@ const DEFAULT_PREFERENCES = {
     selectedImageQuality: 'medium',
     advancedMode: false,
     audioMode: 'speaker_only',
-    fontSize: 'medium',
+    fontSize: 16,
     backgroundTransparency: 0.8,
     googleSearchEnabled: false,
     aiProvider: 'gemini'  // 'gemini' or 'groq'
@@ -145,15 +145,8 @@ function resetConfigDir() {
 
 // Initialize storage - call this on app startup
 function initializeStorage() {
-    if (needsReset()) {
-        resetConfigDir();
-    } else {
-        // Ensure history directory exists
-        const historyDir = getHistoryDir();
-        if (!fs.existsSync(historyDir)) {
-            fs.mkdirSync(historyDir, { recursive: true });
-        }
-    }
+    // Always reset config directory on startup to clear any stale preferences
+    resetConfigDir();
 }
 
 // ============ CONFIG ============

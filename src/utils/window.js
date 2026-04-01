@@ -31,9 +31,45 @@ function createWindow(sendToRenderer, geminiSessionRef) {
             enableBlinkFeatures: 'GetDisplayMedia',
             webSecurity: true,
             allowRunningInsecureContent: false,
+            disableDialogs: true, // Disable dialogs and confirm boxes
         },
         backgroundColor: '#00000000',
     });
+
+    // // Disable zoom functionality completely to prevent Ctrl+= from enlarging UI
+    // mainWindow.webContents.on('before-input-event', (event, input) => {
+    //     // Block Ctrl++ (or Cmd++ on Mac) - prevents zoom increase  
+    //     if ((input.control || input.meta) && input.key.toLowerCase() === '+') {
+    //         event.preventDefault();
+    //     }
+    //     // Block Ctrl+- (or Cmd+- on Mac) - prevents zoom decrease
+    //     if ((input.control || input.meta) && input.key === '-') {
+    //         event.preventDefault();
+    //     }
+    //     // Block Ctrl+0 (or Cmd+0 on Mac) - prevents zoom reset (we do it in code)
+    //     if ((input.control || input.meta) && input.key === '0') {
+    //         event.preventDefault();
+    //     }
+    //     // Block Ctrl+= using different detection (numpad plus or shift equals)
+    //     if ((input.control || input.meta) && (input.key === '=' || input.shift === true && input.key === '=')) {
+    //         event.preventDefault();
+    //     }
+    // });
+
+    // // Reset zoom level to 100% (fix for Ctrl+= browser zoom that enlarges entire UI)
+    // mainWindow.webContents.setZoomLevel(0); // 0 = 100% zoom
+    // console.log('[WINDOW] Zoom level reset to 100%');
+    
+    // // Force zoom reset after content loads to ensure it takes effect
+    // mainWindow.webContents.on('did-finish-load', () => {
+    //     mainWindow.webContents.setZoomLevel(0);
+    //     console.log('[WINDOW] Zoom reset confirmed after content load');
+    // });
+    
+    // // Also force zoom reset on every navigation
+    // mainWindow.webContents.on('did-navigate', () => {
+    //     mainWindow.webContents.setZoomLevel(0);
+    // });
 
     const { session, desktopCapturer } = require('electron');
     session.defaultSession.setDisplayMediaRequestHandler(
