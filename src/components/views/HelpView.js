@@ -357,6 +357,26 @@ export class HelpView extends LitElement {
                         </div>
 
                         <div class="keyboard-group">
+                            <div class="keyboard-group-title">Window Resizing</div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Increase window width</span>
+                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Shift</span><span class="key">Right</span></div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Decrease window width</span>
+                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Shift</span><span class="key">Left</span></div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Increase window height</span>
+                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Alt</span><span class="key">Up</span></div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Decrease window height</span>
+                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Alt</span><span class="key">Down</span></div>
+                            </div>
+                        </div>
+
+                        <div class="keyboard-group">
                             <div class="keyboard-group-title">AI Actions</div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Take screenshot and ask for next step</span>

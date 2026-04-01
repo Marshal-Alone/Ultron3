@@ -154,8 +154,10 @@ function getDefaultKeybinds() {
         quickStartGroq: isMac ? 'Cmd+Shift+S' : 'Ctrl+Shift+S',
         quickStop: 'Alt+S',
         killSwitch: isMac ? 'Cmd+Shift+Delete' : 'Ctrl+Shift+Delete',
-        quickStop: 'Alt+S',
-        killSwitch: isMac ? 'Cmd+Shift+Delete' : 'Ctrl+Shift+Delete',
+        increaseWidth: isMac ? 'Cmd+Shift+Right' : 'Ctrl+Shift+Right',
+        decreaseWidth: isMac ? 'Cmd+Shift+Left' : 'Ctrl+Shift+Left',
+        increaseHeight: isMac ? 'Cmd+Alt+Up' : 'Ctrl+Alt+Up',
+        decreaseHeight: isMac ? 'Cmd+Alt+Down' : 'Ctrl+Alt+Down',
     };
 }
 
@@ -514,6 +516,77 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             console.log(`Registered toggleNavbar: ${keybinds.toggleNavbar}`);
         } catch (error) {
             console.error(`Failed to register toggleNavbar:`, error);
+        }
+    }
+
+    // ==================== WINDOW RESIZE SHORTCUTS ====================
+
+    // Window resize increment in pixels
+    const resizeIncrement = 50;
+
+    // Register increase width shortcut (Ctrl+Shift+=)
+    if (keybinds.increaseWidth) {
+        try {
+            globalShortcut.register(keybinds.increaseWidth, () => {
+                if (!mainWindow || mainWindow.isDestroyed()) return;
+                const [width, height] = mainWindow.getSize();
+                mainWindow.setSize(width + resizeIncrement, height);
+                storage.setWindowSize(width + resizeIncrement, height);
+                console.log(`Window width increased to ${width + resizeIncrement}px`);
+            });
+            console.log(`Registered increaseWidth: ${keybinds.increaseWidth}`);
+        } catch (error) {
+            console.error(`Failed to register increaseWidth:`, error);
+        }
+    }
+
+    // Register decrease width shortcut (Ctrl+Shift+-)
+    if (keybinds.decreaseWidth) {
+        try {
+            globalShortcut.register(keybinds.decreaseWidth, () => {
+                if (!mainWindow || mainWindow.isDestroyed()) return;
+                const [width, height] = mainWindow.getSize();
+                const newWidth = Math.max(200, width - resizeIncrement); // Min width 200px
+                mainWindow.setSize(newWidth, height);
+                storage.setWindowSize(newWidth, height);
+                console.log(`Window width decreased to ${newWidth}px`);
+            });
+            console.log(`Registered decreaseWidth: ${keybinds.decreaseWidth}`);
+        } catch (error) {
+            console.error(`Failed to register decreaseWidth:`, error);
+        }
+    }
+
+    // Register increase height shortcut (Ctrl+Alt+=)
+    if (keybinds.increaseHeight) {
+        try {
+            globalShortcut.register(keybinds.increaseHeight, () => {
+                if (!mainWindow || mainWindow.isDestroyed()) return;
+                const [width, height] = mainWindow.getSize();
+                mainWindow.setSize(width, height + resizeIncrement);
+                storage.setWindowSize(width, height + resizeIncrement);
+                console.log(`Window height increased to ${height + resizeIncrement}px`);
+            });
+            console.log(`Registered increaseHeight: ${keybinds.increaseHeight}`);
+        } catch (error) {
+            console.error(`Failed to register increaseHeight:`, error);
+        }
+    }
+
+    // Register decrease height shortcut (Ctrl+Alt+-)
+    if (keybinds.decreaseHeight) {
+        try {
+            globalShortcut.register(keybinds.decreaseHeight, () => {
+                if (!mainWindow || mainWindow.isDestroyed()) return;
+                const [width, height] = mainWindow.getSize();
+                const newHeight = Math.max(200, height - resizeIncrement); // Min height 200px
+                mainWindow.setSize(width, newHeight);
+                storage.setWindowSize(width, newHeight);
+                console.log(`Window height decreased to ${newHeight}px`);
+            });
+            console.log(`Registered decreaseHeight: ${keybinds.decreaseHeight}`);
+        } catch (error) {
+            console.error(`Failed to register decreaseHeight:`, error);
         }
     }
 
