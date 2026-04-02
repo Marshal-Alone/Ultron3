@@ -191,6 +191,14 @@ export class CheatingDaddyApp extends LitElement {
             this.selectedImageQuality = prefs.selectedImageQuality || 'medium';
             this.layoutMode = config.layout || 'normal';
 
+            // Load invigilator mode preferences
+            const invigilatorTypingMode = prefs.invigilatorTypingMode || 'charByChar';
+            if (invigilatorTypingMode !== 'charByChar') {
+                // Update invigilator state with saved typing mode
+                invigilatorMode.setTypingMode(invigilatorTypingMode);
+                console.log(`[App] Restored invigilator typing mode: ${invigilatorTypingMode}`);
+            }
+
             this._storageLoaded = true;
             this.updateLayoutMode();
             this.requestUpdate();
@@ -219,6 +227,18 @@ export class CheatingDaddyApp extends LitElement {
         invigilatorMode.onTypingModeChange(({ typingMode }) => {
             this.invigilatorTypingMode = typingMode;
             console.log(`[App] Typing Mode: ${typingMode}`);
+            
+            // Save preference to storage
+            if (window.require) {
+                try {
+                    // cheatingDaddy.storage is already available globally
+                    cheatingDaddy.storage.updatePreference('invigilatorTypingMode', typingMode);
+                    console.log(`[App] Saved invigilator typing mode preference: ${typingMode}`);
+                } catch (error) {
+                    console.warn('[App] Failed to save invigilator preference:', error);
+                }
+            }
+            
             this.requestUpdate();
         });
         

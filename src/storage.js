@@ -27,7 +27,10 @@ const DEFAULT_PREFERENCES = {
     fontSize: 16,
     backgroundTransparency: 0.8,
     googleSearchEnabled: false,
-    aiProvider: 'gemini'  // 'gemini' or 'groq'
+    aiProvider: 'gemini',  // 'gemini' or 'groq'
+    // Invigilator Mode preferences
+    invigilatorTypingMode: 'charByChar',  // 'charByChar' or 'instant'
+    invigilatorModeEnabled: false  // Default to disabled
 };
 
 const DEFAULT_KEYBINDS = null; // null means use system defaults
