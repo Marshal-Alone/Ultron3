@@ -6,6 +6,7 @@ const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const storage = require('./storage');
+const { execFile } = require('child_process');
 
 const geminiSessionRef = { current: null };
 let mainWindow = null;
@@ -356,5 +357,26 @@ function setupGeneralIpcHandlers() {
     ipcMain.on('trigger-quick-stop', (event) => {
         console.log('Quick stop triggered via IPC');
         // The shortcut handler already sent 'quick-stop' to renderer
+    });
+
+    // ============ KEYBOARD SIMULATION ============
+    // Handle keyboard key sending for auto-type feature
+    ipcMain.on('keyboard:send-key', (event, key) => {
+        try {
+            console.log(`[KEYBOARD] Sending key: ${key}`);
+            
+            // Create PowerShell command to send key via Windows.Forms API
+            const escapedKey = key.replace(/\$/, '`$').replace(/'/g, "''");
+            const psCommand = `Add-Type -AssemblyName System.Windows.Forms;[System.Windows.Forms.SendKeys]::SendWait('${escapedKey}')`;
+            
+            // Execute PowerShell command
+            execFile('powershell.exe', ['-NoProfile', '-Command', psCommand], { timeout: 1000 }, (error) => {
+                if (error) {
+                    console.error(`[KEYBOARD] Error sending key "${key}":`, error.message);
+                }
+            });
+        } catch (error) {
+            console.error(`[KEYBOARD] Failed to send key "${key}":`, error.message);
+        }
     });
 }

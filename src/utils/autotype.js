@@ -11,14 +11,25 @@
  * @returns {Object} Keyboard control object with sendKey method
  */
 export function getKeyboardControl() {
-  // Try to get keyboard from Electron's main process
   try {
-    // In a real implementation, this would use Electron's API
-    // For now, return a base object that can be injected in tests
+    // Check if we're in Electron context
+    const { BrowserWindow } = window.require ? window.require('electron').remote || {} : {};
+    
+    // Return keyboard object that uses native keyboard simulation
     return {
       sendKey: async (key) => {
-        // Placeholder - will be implemented based on actual Electron setup
-        console.log(`[AutoType] Sent key: ${key}`);
+        // Call main process to simulate keyboard
+        if (window.require) {
+          try {
+            const { ipcRenderer } = window.require('electron');
+            // Send key to be simulated by main process
+            ipcRenderer.send('keyboard:send-key', key);
+          } catch (err) {
+            console.warn(`[AutoType] Could not send key "${key}" via IPC:`, err.message);
+          }
+        } else {
+          console.log(`[AutoType] Sent key: ${key}`);
+        }
       },
     };
   } catch (err) {
