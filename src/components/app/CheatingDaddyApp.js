@@ -338,9 +338,11 @@ export class CheatingDaddyApp extends LitElement {
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
             ipcRenderer.on('new-response', (_, response) => {
+                console.log('[App] [IPC] Received new-response event (first 50 chars):', response.substring(0, 50));
                 this.addNewResponse(response);
             });
             ipcRenderer.on('update-response', (_, response) => {
+                console.log('[App] [IPC] Received update-response event (first 50 chars):', response.substring(0, 50));
                 this.updateCurrentResponse(response);
             });
             ipcRenderer.on('update-status', (_, status) => {
