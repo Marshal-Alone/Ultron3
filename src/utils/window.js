@@ -160,6 +160,11 @@ function getDefaultKeybinds() {
         decreaseWidth: isMac ? 'Cmd+Shift+Left' : 'Ctrl+Shift+Left',
         increaseHeight: isMac ? 'Cmd+Alt+Up' : 'Ctrl+Alt+Up',
         decreaseHeight: isMac ? 'Cmd+Alt+Down' : 'Ctrl+Alt+Down',
+        // Invigilator Mode hotkeys
+        toggleInvigilatorMode: isMac ? 'Cmd+Alt+M' : 'Ctrl+Alt+M',
+        triggerAnswerCapture: isMac ? 'Cmd+Alt+A' : 'Ctrl+Alt+A',
+        confirmAutoType: isMac ? 'Cmd+Alt+Space' : 'Ctrl+Alt+Space',
+        toggleTypingMode: isMac ? 'Cmd+Shift+T' : 'Ctrl+Shift+T',
     };
 }
 
@@ -706,6 +711,68 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
         console.log(`Registered Quick Stop: ${quickStopShortcut}`);
     } catch (error) {
         console.error(`Failed to register Quick Stop (${quickStopShortcut}):`, error);
+    }
+
+    // ==================== INVIGILATOR MODE HOTKEYS ====================
+
+    // Register Toggle Invigilator Mode (Ctrl+Alt+M / Cmd+Alt+M)
+    if (keybinds.toggleInvigilatorMode) {
+        try {
+            globalShortcut.register(keybinds.toggleInvigilatorMode, () => {
+                console.log('[HOTKEYS] Toggle Invigilator Mode triggered');
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    sendToRenderer('invigilator:toggle-mode');
+                }
+            });
+            console.log(`[HOTKEYS] Registered toggleInvigilatorMode: ${keybinds.toggleInvigilatorMode}`);
+        } catch (error) {
+            console.error(`[HOTKEYS] Failed to register toggleInvigilatorMode:`, error);
+        }
+    }
+
+    // Register Trigger Answer Capture (Ctrl+Alt+A / Cmd+Alt+A)
+    if (keybinds.triggerAnswerCapture) {
+        try {
+            globalShortcut.register(keybinds.triggerAnswerCapture, () => {
+                console.log('[HOTKEYS] Trigger Answer Capture triggered');
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    sendToRenderer('invigilator:capture-answer');
+                }
+            });
+            console.log(`[HOTKEYS] Registered triggerAnswerCapture: ${keybinds.triggerAnswerCapture}`);
+        } catch (error) {
+            console.error(`[HOTKEYS] Failed to register triggerAnswerCapture:`, error);
+        }
+    }
+
+    // Register Confirm Auto-Type (Ctrl+Alt+Space / Cmd+Alt+Space)
+    if (keybinds.confirmAutoType) {
+        try {
+            globalShortcut.register(keybinds.confirmAutoType, () => {
+                console.log('[HOTKEYS] Confirm Auto-Type triggered');
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    sendToRenderer('invigilator:confirm-autotype');
+                }
+            });
+            console.log(`[HOTKEYS] Registered confirmAutoType: ${keybinds.confirmAutoType}`);
+        } catch (error) {
+            console.error(`[HOTKEYS] Failed to register confirmAutoType:`, error);
+        }
+    }
+
+    // Register Toggle Typing Mode (Ctrl+Shift+T / Cmd+Shift+T)
+    if (keybinds.toggleTypingMode) {
+        try {
+            globalShortcut.register(keybinds.toggleTypingMode, () => {
+                console.log('[HOTKEYS] Toggle Typing Mode triggered');
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    sendToRenderer('invigilator:toggle-typing-mode');
+                }
+            });
+            console.log(`[HOTKEYS] Registered toggleTypingMode: ${keybinds.toggleTypingMode}`);
+        } catch (error) {
+            console.error(`[HOTKEYS] Failed to register toggleTypingMode:`, error);
+        }
     }
 }
 
