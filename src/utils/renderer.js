@@ -519,6 +519,14 @@ So if its a code question, give me first THE CODE and  then approach in few bull
 If its a question about the website, give me the answer no bs, complete answer.
 If its a mcq question, give me the answer no bs, complete answer.`;
 
+// Special prompt for invigilator mode answer capture
+const INVIGILATOR_ANSWER_PROMPT = `THIS IS AN EXAM QUESTION ON THE SCREEN.
+Analyze it and provide ONLY the answer/code/solution. Nothing else.
+- If CODE question: Provide ONLY the complete, working code. No explanation.
+- If TEXT/ANSWER: Provide ONLY the correct answer. No explanation.
+- If MCQ: Provide ONLY the correct option/answer. No explanation.
+Do NOT include "Here's the code" or any introductory text. JUST THE ANSWER.`;
+
 async function captureManualScreenshot(imageQuality = null) {
     console.log('Manual screenshot triggered');
     const quality = imageQuality || currentImageQuality;
@@ -587,17 +595,35 @@ async function captureManualScreenshot(imageQuality = null) {
                     return;
                 }
 
+                // Determine which prompt to use based on context
+                const isInvigilatorCapture = window._invigilatorAnswerCapture === true;
+                const promptToUse = isInvigilatorCapture ? INVIGILATOR_ANSWER_PROMPT : MANUAL_SCREENSHOT_PROMPT;
+                
+                if (isInvigilatorCapture) {
+                    console.log('[Renderer] Sending screenshot for invigilator answer capture');
+                }
+
                 // Send image with prompt to HTTP API (response streams via IPC events)
                 const result = await ipcRenderer.invoke('send-image-content', {
                     data: base64data,
-                    prompt: MANUAL_SCREENSHOT_PROMPT,
+                    prompt: promptToUse,
                 });
 
                 if (result.success) {
-                    console.log(`Image response completed from ${result.model}`);
+                    if (isInvigilatorCapture) {
+                        console.log('[Renderer] Invigilator answer capture completed');
+                        // Clear the flag when done
+                        window._invigilatorAnswerCapture = false;
+                    } else {
+                        console.log(`Image response completed from ${result.model}`);
+                    }
                     // Response already displayed via streaming events (new-response/update-response)
                 } else {
                     console.error('Failed to get image response:', result.error);
+                    // Clear invigilator flag on error
+                    if (window._invigilatorAnswerCapture) {
+                        window._invigilatorAnswerCapture = false;
+                    }
                     cheatingDaddy.addNewResponse(`Error: ${result.error}`);
                 }
             };

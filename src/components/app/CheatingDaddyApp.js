@@ -396,6 +396,15 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     addNewResponse(response) {
+        // Check if we're capturing an answer for invigilator mode
+        if (window._invigilatorAnswerCapture) {
+            console.log('[addNewResponse] [Invigilator] Captured answer start:', response.substring(0, 50));
+            invigilatorMode.setAnswerCode(response);
+            this._showWindow(); // Show window so user can see preview
+            return;
+        }
+        
+        // Normal response handling
         // Add a new response entry (first word of a new AI response)
         this.responses = [...this.responses, response];
         this.currentResponseIndex = this.responses.length - 1;
@@ -405,6 +414,15 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     updateCurrentResponse(response) {
+        // Check if we're capturing an answer for invigilator mode
+        if (window._invigilatorAnswerCapture) {
+            console.log('[updateCurrentResponse] [Invigilator] Appending answer...');
+            // Append to existing answer code
+            invigilatorMode.setAnswerCode(response);
+            return;
+        }
+        
+        // Normal response handling
         // Update the current response in place (streaming subsequent words)
         if (this.responses.length > 0) {
             this.responses = [...this.responses.slice(0, -1), response];
@@ -607,14 +625,42 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     // Invigilator Mode event handlers
-    _handleAnswerCapture() {
+    async _handleAnswerCapture() {
         console.log('[App] Answer Capture triggered');
-        // TODO: Implement answer capture and AI processing
-        // This will:
-        // 1. Take a screenshot
-        // 2. Send to AI for processing
-        // 3. Store answer code in invigilatorMode
-        // 4. Trigger preview display
+        
+        if (!window.require) {
+            console.warn('[App] Cannot capture answer: Electron not available');
+            return;
+        }
+
+        try {
+            const { ipcRenderer } = window.require('electron');
+            
+            // If captureManualScreenshot is available, use it with override
+            // First hide the app window
+            this._hideWindow();
+            
+            // Wait for window to hide
+            await new Promise(resolve => setTimeout(resolve, 150));
+            
+            // Call captureManualScreenshot if available, otherwise show error
+            if (window.captureManualScreenshot && typeof window.captureManualScreenshot === 'function') {
+                console.log('[App] Calling screenshot capture for invigilator mode...');
+                
+                // Set a flag so that when the response comes back, we store it as answer code
+                window._invigilatorAnswerCapture = true;
+                
+                // Call the existing screenshot function
+                // Response will come through the normal 'new-response' IPC events
+                window.captureManualScreenshot();
+            } else {
+                console.warn('[App] captureManualScreenshot not available');
+                this._showWindow();
+            }
+        } catch (error) {
+            console.error('[App] Failed to capture answer:', error);
+            this._showWindow();
+        }
     }
 
     _handleConfirmAutotype() {
