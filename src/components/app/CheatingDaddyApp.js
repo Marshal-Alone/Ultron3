@@ -6,6 +6,8 @@ import { HelpView } from '../views/HelpView.js';
 import { HistoryView } from '../views/HistoryView.js';
 import { AssistantView } from '../views/AssistantView.js';
 import { OnboardingView } from '../views/OnboardingView.js';
+import { InvigilatorPreviewView } from '../views/InvigilatorPreviewView.js';
+import { invigilatorMode } from '../../utils/invigilatorMode.js';
 
 export class CheatingDaddyApp extends LitElement {
     static styles = css`
@@ -117,6 +119,10 @@ export class CheatingDaddyApp extends LitElement {
         _awaitingNewResponse: { state: true },
         shouldAnimateResponse: { type: Boolean },
         _storageLoaded: { state: true },
+        // Invigilator Mode properties
+        invigilatorModeActive: { type: Boolean, state: true },
+        invigilatorTypingMode: { type: String, state: true },
+        previewVisible: { type: Boolean, state: true },
     };
 
     constructor() {
@@ -142,9 +148,17 @@ export class CheatingDaddyApp extends LitElement {
         this._currentResponseIsComplete = true;
         this.shouldAnimateResponse = false;
         this._storageLoaded = false;
+        
+        // Invigilator Mode defaults
+        this.invigilatorModeActive = false;
+        this.invigilatorTypingMode = 'charByChar';
+        this.previewVisible = false;
 
         // Load from storage
         this._loadFromStorage();
+        
+        // Subscribe to invigilator mode events
+        this._setupInvigilatorModeListeners();
     }
 
     async _loadFromStorage() {
@@ -185,6 +199,69 @@ export class CheatingDaddyApp extends LitElement {
             this.requestUpdate();
         }
     }
+
+    _setupInvigilatorModeListeners() {
+        // Subscribe to mode toggle events
+        invigilatorMode.onModeToggle(({ isActive }) => {
+            this.invigilatorModeActive = isActive;
+            console.log(`[App] Invigilator Mode: ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
+            
+            // Hide or show window based on mode
+            if (isActive) {
+                this._hideWindow();
+            }
+            
+            this.requestUpdate();
+        });
+        
+        // Subscribe to typing mode changes
+        invigilatorMode.onTypingModeChange(({ typingMode }) => {
+            this.invigilatorTypingMode = typingMode;
+            console.log(`[App] Typing Mode: ${typingMode}`);
+            this.requestUpdate();
+        });
+        
+        // Subscribe to preview show events
+        invigilatorMode.onPreviewShow(({ code }) => {
+            // Show preview with the code
+            this.previewVisible = true;
+            console.log(`[App] Showing preview with ${code.length} chars`);
+            this.requestUpdate();
+            
+            // Get the preview component and show the code
+            setTimeout(() => {
+                const preview = this.shadowRoot?.querySelector('invigilator-preview');
+                if (preview) {
+                    preview.show(code, 'javascript');
+                }
+            }, 0);
+        });
+    }
+
+    _hideWindow() {
+        // Request main process to hide the window
+        if (window.require) {
+            try {
+                const { ipcRenderer } = window.require('electron');
+                ipcRenderer.send('invigilator:hide-window');
+            } catch (error) {
+                console.warn('[App] Could not hide window:', error.message);
+            }
+        }
+    }
+
+    _showWindow() {
+        // Request main process to show the window
+        if (window.require) {
+            try {
+                const { ipcRenderer } = window.require('electron');
+                ipcRenderer.send('invigilator:show-window');
+            } catch (error) {
+                console.warn('[App] Could not show window:', error.message);
+            }
+        }
+    }
+
 
     hexToRgb(hex) {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -269,6 +346,29 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.on('toggle-navbar', () => {
                 this.isNavbarHidden = !this.isNavbarHidden;
                 this.requestUpdate();
+            });
+            
+            // ==================== INVIGILATOR MODE IPC LISTENERS ====================
+            ipcRenderer.on('invigilator:toggle-mode', () => {
+                console.log('[App IPC] Received toggle-mode');
+                invigilatorMode.toggleMode();
+            });
+            
+            ipcRenderer.on('invigilator:capture-answer', () => {
+                console.log('[App IPC] Received capture-answer');
+                // This will be handled by answer capture flow (future task)
+                this._handleAnswerCapture();
+            });
+            
+            ipcRenderer.on('invigilator:confirm-autotype', () => {
+                console.log('[App IPC] Received confirm-autotype');
+                // This will be handled by auto-type execution (future task)
+                this._handleConfirmAutotype();
+            });
+            
+            ipcRenderer.on('invigilator:toggle-typing-mode', () => {
+                console.log('[App IPC] Received toggle-typing-mode');
+                invigilatorMode.toggleTypingMode();
             });
         }
     }
@@ -506,6 +606,26 @@ export class CheatingDaddyApp extends LitElement {
         this.currentView = 'main';
     }
 
+    // Invigilator Mode event handlers
+    _handleAnswerCapture() {
+        console.log('[App] Answer Capture triggered');
+        // TODO: Implement answer capture and AI processing
+        // This will:
+        // 1. Take a screenshot
+        // 2. Send to AI for processing
+        // 3. Store answer code in invigilatorMode
+        // 4. Trigger preview display
+    }
+
+    _handleConfirmAutotype() {
+        console.log('[App] Confirm Auto-Type triggered');
+        // TODO: Implement auto-type execution
+        // This will:
+        // 1. Get answer code from invigilatorMode
+        // 2. Execute auto-typing with configured speed
+        // 3. Hide preview after completion
+    }
+
     updated(changedProperties) {
         super.updated(changedProperties);
 
@@ -616,6 +736,8 @@ export class CheatingDaddyApp extends LitElement {
                         .startTime=${this.startTime}
                         .backgroundTransparency=${this.backgroundTransparency}
                         .isNavbarHidden=${this.isNavbarHidden}
+                        .invigilatorModeActive=${this.invigilatorModeActive}
+                        .invigilatorTypingMode=${this.invigilatorTypingMode}
                         .onCustomizeClick=${() => this.handleCustomizeClick()}
                         .onHelpClick=${() => this.handleHelpClick()}
                         .onHistoryClick=${() => this.handleHistoryClick()}
@@ -628,6 +750,11 @@ export class CheatingDaddyApp extends LitElement {
                         <div class="view-container">${this.renderCurrentView()}</div>
                     </div>
                 </div>
+                <!-- Invigilator Mode Preview Component -->
+                <invigilator-preview
+                    ?isVisible=${this.previewVisible}
+                    .typingMode=${this.invigilatorTypingMode}
+                ></invigilator-preview>
             </div>
         `;
     }
