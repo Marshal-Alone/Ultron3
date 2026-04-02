@@ -721,6 +721,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             globalShortcut.register(keybinds.toggleInvigilatorMode, () => {
                 console.log('[HOTKEYS] Toggle Invigilator Mode triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
+                    console.log('[HOTKEYS] Sending IPC: invigilator:toggle-mode');
                     sendToRenderer('invigilator:toggle-mode');
                 }
             });
@@ -736,6 +737,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             globalShortcut.register(keybinds.triggerAnswerCapture, () => {
                 console.log('[HOTKEYS] Trigger Answer Capture triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
+                    console.log('[HOTKEYS] Sending IPC: invigilator:capture-answer');
                     sendToRenderer('invigilator:capture-answer');
                 }
             });
@@ -751,6 +753,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             globalShortcut.register(keybinds.confirmAutoType, () => {
                 console.log('[HOTKEYS] Confirm Auto-Type triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
+                    console.log('[HOTKEYS] Sending IPC: invigilator:confirm-autotype');
                     sendToRenderer('invigilator:confirm-autotype');
                 }
             });
@@ -766,6 +769,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             globalShortcut.register(keybinds.toggleTypingMode, () => {
                 console.log('[HOTKEYS] Toggle Typing Mode triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
+                    console.log('[HOTKEYS] Sending IPC: invigilator:toggle-typing-mode');
                     sendToRenderer('invigilator:toggle-typing-mode');
                 }
             });

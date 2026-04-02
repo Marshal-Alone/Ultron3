@@ -150,6 +150,37 @@ export class AppHeader extends LitElement {
             display: none;
             border: none;
         }
+
+        .invigilator-mode-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(0, 255, 136, 0.1);
+            color: #00ff88;
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            letter-spacing: 0.5px;
+        }
+
+        .invigilator-mode-indicator.inactive {
+            opacity: 0.3;
+            background: rgba(128, 128, 128, 0.1);
+            color: var(--text-secondary);
+            border-color: transparent;
+        }
+
+        .invigilator-mode-indicator.char-by-char::before {
+            content: '⌨️';
+            font-size: 10px;
+        }
+
+        .invigilator-mode-indicator.instant::before {
+            content: '⚡';
+            font-size: 10px;
+        }
     `;
 
     static properties = {
@@ -167,6 +198,9 @@ export class AppHeader extends LitElement {
         isClickThrough: { type: Boolean, reflect: true },
         updateAvailable: { type: Boolean },
         aiProvider: { type: String },
+        // Invigilator Mode properties
+        invigilatorModeActive: { type: Boolean },
+        invigilatorTypingMode: { type: String },
     };
 
     constructor() {
@@ -186,6 +220,9 @@ export class AppHeader extends LitElement {
         this.updateAvailable = false;
         this._timerInterval = null;
         this.aiProvider = 'gemini';
+        // Invigilator Mode defaults
+        this.invigilatorModeActive = false;
+        this.invigilatorTypingMode = 'charByChar';
         this._loadAiProvider();
     }
 
@@ -359,11 +396,20 @@ export class AppHeader extends LitElement {
         const elapsedTime = this.getElapsedTime();
         const shouldHideHeader = this.isNavbarHidden || (this.currentView === 'assistant' && this.backgroundTransparency < 0.7);
         const headerClass = shouldHideHeader ? 'header hidden' : 'header';
+        
+        // Get invigilator mode indicator class
+        const indicatorClass = this.invigilatorModeActive 
+            ? `invigilator-mode-indicator ${this.invigilatorTypingMode === 'instant' ? 'instant' : 'char-by-char'}`
+            : 'invigilator-mode-indicator inactive';
+        const indicatorLabel = this.invigilatorModeActive 
+            ? `${this.invigilatorTypingMode === 'instant' ? 'Instant' : 'Char-by-Char'}`
+            : 'Invigilator OFF';
 
         return html`
             <div class="${headerClass}">
                 <div class="header-title">${this.getViewTitle()}</div>
                 <div class="header-actions">
+                    ${this.invigilatorModeActive ? html`<div class="${indicatorClass}" title="Invigilator Mode: ${indicatorLabel}">${indicatorLabel}</div>` : ''}
                     ${this.currentView === 'assistant'
                 ? html`
                               <div class="provider-badge ${this.aiProvider}" @click=${this._toggleAiProvider} title="Click to switch AI provider">
