@@ -422,6 +422,14 @@ export class CheatingDaddyApp extends LitElement {
             console.log('[addNewResponse] [Invigilator] Captured answer start:', response.substring(0, 50));
             invigilatorMode.setAnswerCode(response);
             this._showWindow(); // Show window so user can see preview
+            
+            // Schedule flag clearing after response streaming completes
+            clearTimeout(this._invigilatorCaptureTimeout);
+            this._invigilatorCaptureTimeout = setTimeout(() => {
+                console.log('[addNewResponse] [Invigilator] Capture complete, clearing flag');
+                window._invigilatorAnswerCapture = false;
+            }, 500); // Wait 500ms for all streaming to finish
+            
             return;
         }
         
@@ -440,6 +448,14 @@ export class CheatingDaddyApp extends LitElement {
             console.log('[updateCurrentResponse] [Invigilator] Appending answer...');
             // Append to existing answer code
             invigilatorMode.setAnswerCode(response);
+            
+            // Reset the timeout since we're still receiving data
+            clearTimeout(this._invigilatorCaptureTimeout);
+            this._invigilatorCaptureTimeout = setTimeout(() => {
+                console.log('[updateCurrentResponse] [Invigilator] Capture complete, clearing flag');
+                window._invigilatorAnswerCapture = false;
+            }, 500); // Wait 500ms after last chunk for streaming to finish
+            
             return;
         }
         

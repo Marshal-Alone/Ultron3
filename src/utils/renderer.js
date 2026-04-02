@@ -611,9 +611,9 @@ async function captureManualScreenshot(imageQuality = null) {
 
                 if (result.success) {
                     if (isInvigilatorCapture) {
-                        console.log('[Renderer] Invigilator answer capture completed');
-                        // Clear the flag when done
-                        window._invigilatorAnswerCapture = false;
+                        console.log('[Renderer] Invigilator answer capture started - responses streaming...');
+                        // DO NOT clear the flag here! Let it remain true while responses stream in.
+                        // The CheatingDaddyApp will handle clearing it after processing completes.
                     } else {
                         console.log(`Image response completed from ${result.model}`);
                     }
@@ -622,6 +622,7 @@ async function captureManualScreenshot(imageQuality = null) {
                     console.error('Failed to get image response:', result.error);
                     // Clear invigilator flag on error
                     if (window._invigilatorAnswerCapture) {
+                        console.log('[Renderer] Invigilator capture failed, clearing flag');
                         window._invigilatorAnswerCapture = false;
                     }
                     cheatingDaddy.addNewResponse(`Error: ${result.error}`);
