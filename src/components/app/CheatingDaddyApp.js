@@ -8,6 +8,7 @@ import { AssistantView } from '../views/AssistantView.js';
 import { OnboardingView } from '../views/OnboardingView.js';
 import { InvigilatorPreviewView } from '../views/InvigilatorPreviewView.js';
 import { invigilatorMode } from '../../utils/invigilatorMode.js';
+import { createAutotyper, getKeyboardControl } from '../../utils/autotype.js';
 
 export class CheatingDaddyApp extends LitElement {
     static styles = css`
@@ -663,13 +664,51 @@ export class CheatingDaddyApp extends LitElement {
         }
     }
 
-    _handleConfirmAutotype() {
+    async _handleConfirmAutotype() {
         console.log('[App] Confirm Auto-Type triggered');
-        // TODO: Implement auto-type execution
-        // This will:
-        // 1. Get answer code from invigilatorMode
-        // 2. Execute auto-typing with configured speed
-        // 3. Hide preview after completion
+        
+        // Get the captured answer code from invigilator mode state
+        const answerCode = invigilatorMode.getState().lastAnswerCode;
+        const typingMode = invigilatorMode.getState().typingMode;
+        
+        if (!answerCode) {
+            console.warn('[App] No answer code available for auto-typing');
+            return;
+        }
+        
+        try {
+            console.log(`[App] Starting auto-type with mode: ${typingMode} (${answerCode.length} chars)`);
+            
+            // Get keyboard control object
+            const keyboard = getKeyboardControl();
+            
+            // Create autotyper instance
+            const autotyper = createAutotyper(keyboard);
+            
+            // Execute typing based on mode
+            if (typingMode === 'charByChar') {
+                console.log('[App] Using char-by-char typing mode');
+                await autotyper.typeCharByChar(answerCode);
+            } else if (typingMode === 'instant') {
+                console.log('[App] Using instant typing mode');
+                await autotyper.typeInstant(answerCode);
+            } else {
+                console.warn(`[App] Unknown typing mode: ${typingMode}, defaulting to char-by-char`);
+                await autotyper.typeCharByChar(answerCode);
+            }
+            
+            console.log('[App] Auto-typing completed successfully');
+            
+            // Hide the preview after successful typing
+            this.previewVisible = false;
+            this.requestUpdate();
+            
+            // Keep app visible so user can see what was typed
+            // Response to any errors will be logged but app continues
+        } catch (error) {
+            console.error('[App] Auto-type execution failed:', error);
+            // Preview remains visible so user can manually copy/type
+        }
     }
 
     updated(changedProperties) {
