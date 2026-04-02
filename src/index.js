@@ -365,16 +365,36 @@ function setupGeneralIpcHandlers() {
         try {
             console.log(`[KEYBOARD] Sending key: ${key}`);
             
-            // Create PowerShell command to send key via Windows.Forms API
-            const escapedKey = key.replace(/\$/, '`$').replace(/'/g, "''");
+            // Map special characters for SendKeys method
+            const sendKeysMap = {
+                '{': '{{',
+                '}': '}}',
+                '+': '{PLUS}',
+                '^': '{CARET}',
+                '%': '{PERCENT}',
+                '\n': '{ENTER}',
+                '\t': '{TAB}',
+            };
+            
+            // Convert key using map, or use as-is
+            let mappedKey = key;
+            if (sendKeysMap[key]) {
+                mappedKey = sendKeysMap[key];
+            }
+            
+            // Create PowerShell command with proper escaping
+            const escapedKey = mappedKey.replace(/'/g, "''").replace(/\$/g, '`$');
             const psCommand = `Add-Type -AssemblyName System.Windows.Forms;[System.Windows.Forms.SendKeys]::SendWait('${escapedKey}')`;
             
             // Execute PowerShell command
-            execFile('powershell.exe', ['-NoProfile', '-Command', psCommand], { timeout: 1000 }, (error) => {
-                if (error) {
-                    console.error(`[KEYBOARD] Error sending key "${key}":`, error.message);
+            execFile('powershell.exe', ['-NoProfile', '-Command', psCommand], 
+                { timeout: 2000 }, 
+                (error, stdout, stderr) => {
+                    if (error) {
+                        console.error(`[KEYBOARD] Error sending "${key}" (mapped: "${mappedKey}"):`, (stderr || error.message).split('\n')[0]);
+                    }
                 }
-            });
+            );
         } catch (error) {
             console.error(`[KEYBOARD] Failed to send key "${key}":`, error.message);
         }
