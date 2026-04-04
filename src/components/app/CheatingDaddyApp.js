@@ -727,6 +727,12 @@ export class CheatingDaddyApp extends LitElement {
             if (typingMode === 'charByChar') {
                 console.log('[App] Using char-by-char typing mode');
                 await autotyper.typeCharByChar(answerCode);
+            } else if (typingMode === 'wordByWord') {
+                console.log('[App] Using word-by-word typing mode');
+                await autotyper.typeWordByWord(answerCode);
+            } else if (typingMode === 'lineByLine') {
+                console.log('[App] Using line-by-line typing mode');
+                await autotyper.typeLineByLine(answerCode);
             } else if (typingMode === 'instant') {
                 console.log('[App] Using instant typing mode');
                 await autotyper.typeInstant(answerCode);

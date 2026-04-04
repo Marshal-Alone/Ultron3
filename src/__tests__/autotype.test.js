@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createAutotyper, typeCharByChar, typeInstant, sendSpecialKey, getKeyboardControl } from '../utils/autotype.js';
+import { createAutotyper, typeCharByChar, typeInstant, typeWordByWord, typeLineByLine, sendSpecialKey, getKeyboardControl } from '../utils/autotype.js';
 
 describe('Auto-Type Engine', () => {
   let mockKeyboard;
@@ -106,6 +106,81 @@ describe('Auto-Type Engine', () => {
     });
   });
 
+  describe('typeWordByWord', () => {
+    it('types words separated by spaces with pauses between words', async () => {
+      mockKeyboard.sendKey = vi.fn().mockResolvedValue(undefined);
+      
+      const text = 'hello world';
+      const autotyper = createAutotyper(mockKeyboard);
+      
+      const promise = autotyper.typeWordByWord(text, { charDelay: 10, wordDelay: 50 });
+      
+      await vi.runAllTimersAsync();
+      await promise;
+
+      // Should have sent 'h', 'e', 'l', 'l', 'o', ' ', 'w', 'o', 'r', 'l', 'd'
+      expect(mockKeyboard.sendKey).toHaveBeenCalledTimes(text.length);
+      expect(mockKeyboard.sendKey).toHaveBeenNthCalledWith(1, 'h');
+      expect(mockKeyboard.sendKey).toHaveBeenNthCalledWith(6, ' '); // space between words
+      expect(mockKeyboard.sendKey).toHaveBeenNthCalledWith(11, 'd');
+    });
+
+    it('handles newlines and tabs correctly', async () => {
+      mockKeyboard.sendKey = vi.fn().mockResolvedValue(undefined);
+      
+      const text = 'hello\nworld\ttab';
+      const autotyper = createAutotyper(mockKeyboard);
+      
+      const promise = autotyper.typeWordByWord(text, { charDelay: 10, wordDelay: 50 });
+      
+      await vi.runAllTimersAsync();
+      await promise;
+
+      // Should send 'Enter' for newline and 'Tab' for tab
+      const calls = mockKeyboard.sendKey.mock.calls;
+      expect(calls.some(call => call[0] === 'Enter')).toBe(true);
+      expect(calls.some(call => call[0] === 'Tab')).toBe(true);
+    });
+  });
+
+  describe('typeLineByLine', () => {
+    it('types lines separated by newlines with pauses between lines', async () => {
+      mockKeyboard.sendKey = vi.fn().mockResolvedValue(undefined);
+      
+      const text = 'first line\nsecond line';
+      const autotyper = createAutotyper(mockKeyboard);
+      
+      const promise = autotyper.typeLineByLine(text, { charDelay: 10, lineDelay: 50 });
+      
+      await vi.runAllTimersAsync();
+      await promise;
+
+      // Should have sent all characters plus Enter between lines
+      const calls = mockKeyboard.sendKey.mock.calls;
+      // 'first line' = 10 chars + Enter + 'second line' = 11 chars = 22 total
+      expect(calls.length).toBe(22);
+      
+      // Find the Enter key call
+      expect(calls.some(call => call[0] === 'Enter')).toBe(true);
+    });
+
+    it('handles last line without trailing newline', async () => {
+      mockKeyboard.sendKey = vi.fn().mockResolvedValue(undefined);
+      
+      const text = 'only\none\nline';
+      const autotyper = createAutotyper(mockKeyboard);
+      
+      const promise = autotyper.typeLineByLine(text, { charDelay: 10, lineDelay: 50 });
+      
+      await vi.runAllTimersAsync();
+      await promise;
+
+      // Should have 3 lines, so 2 Enter keys
+      const enterCalls = mockKeyboard.sendKey.mock.calls.filter(call => call[0] === 'Enter');
+      expect(enterCalls.length).toBe(2);
+    });
+  });
+
   describe('sendSpecialKey', () => {
     it('sends special keys like Enter, Tab, Backspace', async () => {
       mockKeyboard.sendKey = vi.fn().mockResolvedValue(undefined);
@@ -130,6 +205,8 @@ describe('Auto-Type Engine', () => {
       expect(autotyper).toBeDefined();
       expect(typeof autotyper.typeCharByChar).toBe('function');
       expect(typeof autotyper.typeInstant).toBe('function');
+      expect(typeof autotyper.typeWordByWord).toBe('function');
+      expect(typeof autotyper.typeLineByLine).toBe('function');
       expect(typeof autotyper.sendSpecialKey).toBe('function');
     });
   });

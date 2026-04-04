@@ -365,8 +365,27 @@ function setupGeneralIpcHandlers() {
         try {
             console.log(`[KEYBOARD] Sending key: ${key}`);
             
-            // Map special characters for SendKeys method
+            // Map special key names and characters for SendKeys method
             const sendKeysMap = {
+                // Special key names (from autotype.js)
+                'Enter': '{ENTER}',
+                'Tab': '{TAB}',
+                'Backspace': '{BACKSPACE}',
+                'Delete': '{DELETE}',
+                'Escape': '{ESCAPE}',
+                'Home': '{HOME}',
+                'End': '{END}',
+                'PageUp': '{PAGEUP}',
+                'PageDown': '{PAGEDOWN}',
+                'ArrowUp': '{UP}',
+                'ArrowDown': '{DOWN}',
+                'ArrowLeft': '{LEFT}',
+                'ArrowRight': '{RIGHT}',
+                'Shift': '+',
+                'Control': '^',
+                'Alt': '%',
+                
+                // Special characters
                 '{': '{{',
                 '}': '}}',
                 '+': '{PLUS}',
@@ -397,6 +416,71 @@ function setupGeneralIpcHandlers() {
             );
         } catch (error) {
             console.error(`[KEYBOARD] Failed to send key "${key}":`, error.message);
+        }
+    });
+
+    // Synchronous handler for keyboard:send-key (used by sendSync)
+    ipcMain.handle('keyboard:send-key-sync', async (event, key) => {
+        try {
+            console.log(`[KEYBOARD] Sending key (sync): ${key}`);
+            
+            // Map special key names and characters for SendKeys method
+            const sendKeysMap = {
+                // Special key names (from autotype.js)
+                'Enter': '{ENTER}',
+                'Tab': '{TAB}',
+                'Backspace': '{BACKSPACE}',
+                'Delete': '{DELETE}',
+                'Escape': '{ESCAPE}',
+                'Home': '{HOME}',
+                'End': '{END}',
+                'PageUp': '{PAGEUP}',
+                'PageDown': '{PAGEDOWN}',
+                'ArrowUp': '{UP}',
+                'ArrowDown': '{DOWN}',
+                'ArrowLeft': '{LEFT}',
+                'ArrowRight': '{RIGHT}',
+                'Shift': '+',
+                'Control': '^',
+                'Alt': '%',
+                
+                // Special characters
+                '{': '{{',
+                '}': '}}',
+                '+': '{PLUS}',
+                '^': '{CARET}',
+                '%': '{PERCENT}',
+                '\n': '{ENTER}',
+                '\t': '{TAB}',
+            };
+            
+            // Convert key using map, or use as-is
+            let mappedKey = key;
+            if (sendKeysMap[key]) {
+                mappedKey = sendKeysMap[key];
+            }
+            
+            // Create PowerShell command with proper escaping
+            const escapedKey = mappedKey.replace(/'/g, "''").replace(/\$/g, '`$');
+            const psCommand = `Add-Type -AssemblyName System.Windows.Forms;[System.Windows.Forms.SendKeys]::SendWait('${escapedKey}')`;
+            
+            // Execute PowerShell command and wait for completion
+            return new Promise((resolve, reject) => {
+                execFile('powershell.exe', ['-NoProfile', '-Command', psCommand], 
+                    { timeout: 2000 }, 
+                    (error, stdout, stderr) => {
+                        if (error) {
+                            console.error(`[KEYBOARD] Error sending "${key}" (mapped: "${mappedKey}"):`, (stderr || error.message).split('\n')[0]);
+                            reject(error);
+                        } else {
+                            resolve(true);
+                        }
+                    }
+                );
+            });
+        } catch (error) {
+            console.error(`[KEYBOARD] Failed to send key "${key}":`, error.message);
+            throw error;
         }
     });
 }

@@ -41,10 +41,11 @@ export class InvigilatorModeManager {
 
   /**
    * Set typing mode explicitly
-   * @param {string} mode - 'charByChar' or 'instant'
+   * @param {string} mode - 'charByChar', 'wordByWord', 'lineByLine', or 'instant'
    */
   setTypingMode(mode) {
-    if (mode !== 'charByChar' && mode !== 'instant') {
+    const validModes = ['charByChar', 'wordByWord', 'lineByLine', 'instant'];
+    if (!validModes.includes(mode)) {
       console.warn(`[InvigilatorMode] Invalid typing mode: ${mode}. Using charByChar.`);
       mode = 'charByChar';
     }
@@ -59,10 +60,14 @@ export class InvigilatorModeManager {
   }
 
   /**
-   * Toggle between charByChar and instant modes
+   * Toggle between typing modes (charByChar -> wordByWord -> lineByLine -> instant -> charByChar)
    */
   toggleTypingMode() {
-    this.typingMode = this.typingMode === 'charByChar' ? 'instant' : 'charByChar';
+    const modes = ['charByChar', 'wordByWord', 'lineByLine', 'instant'];
+    const currentIndex = modes.indexOf(this.typingMode);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    
+    this.typingMode = modes[nextIndex];
     console.log(`[InvigilatorMode] Typing mode toggled to: ${this.typingMode}`);
     
     // Notify all subscribers

@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ultron — Autotyper</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cream:    #f5f0e8;
+      --cream2:   #ede8de;
+      --cream3:   #e0d9cc;
+      --navy:     #0d1b2a;
+      --navy2:    #1a2f45;
+      --navy3:    #2e4a65;
+      --lime:     #b8f000;
+      --lime-dark:#8ab800;
+      --rust:     #c1440e;
+      --muted:    #8a8070;
+      --muted2:   #b5ac9f;
+      --white:    #ffffff;
+      --border:   rgba(13,27,42,0.1);
+      --border2:  rgba(13,27,42,0.18);
+      --sans:     'Syne', sans-serif;
+      --mono:     'IBM Plex Mono', monospace;
+      --radius:   6px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { font-size: 16px; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--cream);
+      color: var(--navy);
+      min-height: 100vh;
+      display: flex;
+      overflow-x: hidden;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: 280px;
+      min-height: 100vh;
+      background: var(--navy);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .sidebar-logo {
+      padding: 32px 28px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .logo-word {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--white);
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+
+    .logo-word em {
+      color: var(--lime);
+      font-style: normal;
+    }
+
+    .logo-tagline {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: rgba(255,255,255,0.3);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-top: 6px;
+    }
+
+    /* Status pill */
+    .status-area {
+      padding: 24px 28px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .status-dot-wrap {
+      position: relative;
+      width: 10px;
+      height: 10px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--lime);
+    }
+
+    .status-dot.pulse::after {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border-radius: 50%;
+      border: 1.5px solid var(--lime);
+      animation: ripple 1s ease infinite;
+    }
+
+    @keyframes ripple {
+      0%   { transform: scale(0.8); opacity: 1; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+
+    .status-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 1px;
+    }
+
+    #statusBadge {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 1px;
+      color: var(--lime);
+    }
+
+    #statusBadge.typing { color: #ffcc44; animation: flash 0.6s ease infinite; }
+    #statusBadge.paused { color: var(--muted2); }
+
+    @keyframes flash {
+      0%,100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Shortcut keys */
+    .key-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .key-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .key-role {
+      font-size: 11px;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 0.5px;
+      font-weight: 500;
+    }
+
+    .key-chip {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--navy);
+      background: var(--lime);
+      padding: 3px 11px;
+      border-radius: 3px;
+      letter-spacing: 0.5px;
+      transition: all 0.2s;
+    }
+
+    .key-chip.stop-chip {
+      background: rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.7);
+    }
+
+    /* Mode display */
+    .mode-section {
+      padding: 22px 28px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .mode-heading {
+      font-size: 10px;
+      color: rgba(255,255,255,0.3);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .mode-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(184,240,0,0.12);
+      border: 1px solid rgba(184,240,0,0.25);
+      padding: 8px 14px;
+      border-radius: 4px;
+    }
+
+    .mode-icon {
+      width: 7px;
+      height: 7px;
+      background: var(--lime);
+      border-radius: 1px;
+    }
+
+    .mode-text {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--lime);
+      letter-spacing: 1px;
+    }
+
+    /* Sidebar footer */
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 20px 28px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: rgba(255,255,255,0.15);
+      letter-spacing: 1px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+
+    /* ── MAIN CONTENT ── */
+    .main {
+      flex: 1;
+      padding: 40px 44px 60px;
+      max-width: 680px;
+    }
+
+    .page-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 36px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .page-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border2);
+    }
+
+    /* ── INFO STRIP ── */
+    .info-strip {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--lime-dark);
+      padding: 14px 18px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      color: var(--navy3);
+      line-height: 1.65;
+      margin-bottom: 36px;
+    }
+
+    .info-strip strong { color: var(--navy); font-weight: 600; }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px 26px;
+      margin-bottom: 20px;
+      animation: fadeUp 0.4s ease both;
+    }
+
+    .card:nth-child(1) { animation-delay: 0.05s; }
+    .card:nth-child(2) { animation-delay: 0.1s; }
+    .card:nth-child(3) { animation-delay: 0.15s; }
+    .card:nth-child(4) { animation-delay: 0.2s; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-title-line {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── CONFIG GRID ── */
+    .cfg-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    input[type="text"],
+    select,
+    textarea {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--navy);
+      background: var(--cream);
+      border: 1.5px solid var(--cream3);
+      border-radius: var(--radius);
+      padding: 10px 13px;
+      outline: none;
+      transition: border-color 0.18s, background 0.18s;
+      width: 100%;
+    }
+
+    input[type="text"]:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--lime-dark);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(138,184,0,0.12);
+    }
+
+    .field-hint {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted2);
+    }
+
+    select {
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238a8070'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+      cursor: pointer;
+    }
+
+    /* Speed slider */
+    .speed-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      flex: 1;
+      height: 4px;
+      background: var(--cream3);
+      border: none;
+      border-radius: 2px;
+      padding: 0;
+      cursor: pointer;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--navy);
+      border-radius: 50%;
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+    .speed-val {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--navy);
+      background: var(--cream2);
+      padding: 4px 9px;
+      border-radius: 4px;
+      min-width: 46px;
+      text-align: center;
+    }
+
+    /* ── TEXT LIST ── */
+    .text-list {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .text-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 13px 14px;
+      border-radius: var(--radius);
+      border: 1.5px solid transparent;
+      transition: all 0.16s;
+      cursor: default;
+    }
+
+    .text-item:hover {
+      background: var(--cream);
+      border-color: var(--border2);
+    }
+
+    .text-num {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted2);
+      min-width: 20px;
+    }
+
+    .text-info { flex: 1; min-width: 0; }
+
+    .text-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--navy);
+    }
+
+    .text-preview {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .del-btn {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted2);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      padding: 5px 10px;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .del-btn:hover {
+      color: var(--rust);
+      border-color: rgba(193,68,14,0.25);
+      background: rgba(193,68,14,0.06);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 32px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted2);
+      border: 1.5px dashed var(--border2);
+      border-radius: var(--radius);
+    }
+
+    /* ── ADD FORM ── */
+    .add-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 90px;
+      line-height: 1.65;
+    }
+
+    .add-btn {
+      font-family: var(--sans);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--navy);
+      background: var(--lime);
+      border: none;
+      border-radius: var(--radius);
+      padding: 13px 22px;
+      cursor: pointer;
+      transition: all 0.18s;
+      align-self: flex-start;
+    }
+
+    .add-btn:hover {
+      background: #c9ff00;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(184,240,0,0.3);
+    }
+
+    .add-btn:active {
+      transform: scale(0.98);
+      box-shadow: none;
+    }
+
+    /* ── DEBUG ── */
+    .debug-card {
+      background: var(--navy);
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin-bottom: 20px;
+    }
+
+    .debug-title {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: rgba(255,255,255,0.25);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    #debugConfig {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: rgba(184,240,0,0.7);
+      white-space: pre-wrap;
+      line-height: 1.9;
+    }
+
+    /* ── TOAST NOTIFICATIONS ── */
+    .toast-wrap {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 999;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .toast {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--navy);
+      color: var(--white);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 12px 18px;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      animation: toastIn 0.25s cubic-bezier(0.34,1.56,0.64,1) both;
+      pointer-events: auto;
+    }
+
+    .toast::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--lime);
+      flex-shrink: 0;
+    }
+
+    .toast.err::before { background: var(--rust); }
+    .toast.err { border-left: 3px solid var(--rust); }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(14px) scale(0.95); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-word">UL<em>T</em>RON</div>
+      <div class="logo-tagline">Global Text Autotyper</div>
+    </div>
+
+    <div class="status-area">
+      <div class="status-row">
+        <div class="status-dot-wrap">
+          <div class="status-dot pulse" id="dotEl"></div>
+        </div>
+        <span class="status-label">STATUS &nbsp;/</span>
+        <span id="statusBadge">STANDBY</span>
+      </div>
+
+      <div class="key-list">
+        <div class="key-row">
+          <span class="key-role">Type trigger</span>
+          <span class="key-chip" id="shortcutDisplay">F8</span>
+        </div>
+        <div class="key-row">
+          <span class="key-role">Stop trigger</span>
+          <span class="key-chip stop-chip" id="stopShortcutDisplay">Escape</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="mode-section">
+      <div class="mode-heading">Active mode</div>
+      <div class="mode-badge">
+        <div class="mode-icon"></div>
+        <div class="mode-text" id="modeDisplay">CHAR</div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">v1.0.0 &nbsp;·&nbsp; ultron</div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="page-title">Configuration</div>
+
+    <!-- How it works -->
+    <div class="info-strip">
+      <strong>How it works:</strong> Click into any input field — Chrome, Notepad, VS Code — then press your trigger key. Ultron types the next text character-by-character into whatever is focused.
+    </div>
+
+    <!-- Config card -->
+    <div class="card">
+      <div class="card-title">Settings <div class="card-title-line"></div></div>
+      <div class="cfg-grid">
+        <div class="field">
+          <div class="field-label">Type Shortcut</div>
+          <input type="text" id="shortcutInput" placeholder="e.g., F8">
+          <div class="field-hint">// single key — F8, Insert</div>
+        </div>
+        <div class="field">
+          <div class="field-label">Stop Shortcut</div>
+          <input type="text" id="stopShortcutInput" placeholder="e.g., Escape">
+          <div class="field-hint">// single key — Escape, F9</div>
+        </div>
+        <div class="field">
+          <div class="field-label">Typing Mode</div>
+          <select id="typingMode">
+            <option value="char">Character by character</option>
+            <option value="word">Word by word</option>
+            <option value="line">Line by line</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Selected Text</div>
+          <select id="selectedText"></select>
+          <div class="field-hint">// this item will be typed when you hold F8</div>
+        </div>
+        <div class="field">
+          <div class="field-label">Delay between keystrokes</div>
+          <div class="speed-wrap">
+            <input type="range" id="speedSlider" min="10" max="200" value="50" step="10">
+            <div class="speed-val" id="speedValue">50ms</div>
+          </div>
+          <div class="field-hint">// lower = faster</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Texts list card -->
+    <div class="card">
+      <div class="card-title">Predefined Texts <div class="card-title-line"></div></div>
+      <div class="text-list" id="textList">
+        <div class="empty-state">no texts yet — add one below</div>
+      </div>
+    </div>
+
+    <!-- Add text card -->
+    <div class="card">
+      <div class="card-title">Add New Text <div class="card-title-line"></div></div>
+      <div class="add-form">
+        <input type="text" id="textName" placeholder="Label — e.g. Java Snippet">
+        <textarea id="textContent" placeholder="Text to type...&#10;Supports multiline, tabs, newlines"></textarea>
+        <button class="add-btn" onclick="addNewText()">+ Add Text</button>
+      </div>
+    </div>
+
+    <!-- Debug card -->
+    <div class="debug-card">
+      <div class="debug-title">&gt; config snapshot</div>
+      <div id="debugConfig">loading...</div>
+    </div>
+
+  </main>
+
+  <!-- TOASTS -->
+  <div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+  async function initApp() {
+    try {
+      const config = await window.api.getConfig()
+      renderConfig(config)
+      document.getElementById('shortcutInput').value = config.shortcut
+      document.getElementById('stopShortcutInput').value = config.stopShortcut
+
+      window.api.onTextTyped(()    => setStatus('typing'))
+      window.api.onTypingStopped(()=> setStatus('standby'))
+      window.api.onTypingPaused(() => setStatus('paused'))
+      window.api.onTypingResumed(()=> setStatus('typing'))
+      window.api.onTypingFinished(()=>setStatus('standby'))
+    } catch (e) {
+      toast('Failed to init', true)
+    }
+  }
+
+  function setStatus(s) {
+    const badge = document.getElementById('statusBadge')
+    const dot   = document.getElementById('dotEl')
+    badge.className = s === 'typing' ? 'typing' : s === 'paused' ? 'paused' : ''
+    badge.textContent = s === 'typing' ? 'TYPING' : s === 'paused' ? 'PAUSED' : 'STANDBY'
+    dot.style.background = s === 'typing' ? '#ffcc44' : s === 'paused' ? '#888' : 'var(--lime)'
+  }
+
+  function updateModeDisplay(mode) {
+    const map = { char: 'CHAR', word: 'WORD', line: 'LINE' }
+    document.getElementById('modeDisplay').textContent = map[mode] || mode
+  }
+
+  function renderConfig(cfg) {
+    document.getElementById('debugConfig').textContent = JSON.stringify({
+      typingMode: cfg.typingMode,
+      typingSpeed: cfg.typingSpeed,
+      shortcut: cfg.shortcut,
+      stopShortcut: cfg.stopShortcut,
+      currentTextIndex: cfg.currentTextIndex,
+      textsCount: cfg.predefinedTexts.length
+    }, null, 2)
+
+    document.getElementById('shortcutDisplay').textContent = cfg.shortcut
+    document.getElementById('stopShortcutDisplay').textContent = cfg.stopShortcut
+    document.getElementById('typingMode').value = cfg.typingMode
+    document.getElementById('speedSlider').value = cfg.typingSpeed
+    document.getElementById('speedValue').textContent = cfg.typingSpeed + 'ms'
+    updateModeDisplay(cfg.typingMode)
+
+    const selectedText = document.getElementById('selectedText')
+    if (!cfg.predefinedTexts.length) {
+      selectedText.innerHTML = '<option value="">No texts available</option>'
+      selectedText.value = ''
+      selectedText.disabled = true
+    } else {
+      selectedText.disabled = false
+      selectedText.innerHTML = cfg.predefinedTexts.map((item, i) => (
+        `<option value="${i}">${String(i + 1).padStart(2, '0')} - ${esc(item.name)}</option>`
+      )).join('')
+
+      const maxIndex = cfg.predefinedTexts.length - 1
+      const selectedIndex = Math.min(Math.max(cfg.currentTextIndex || 0, 0), maxIndex)
+      selectedText.value = String(selectedIndex)
+    }
+
+    const list = document.getElementById('textList')
+    if (!cfg.predefinedTexts.length) {
+      list.innerHTML = '<div class="empty-state">no texts yet — add one below</div>'
+      return
+    }
+    list.innerHTML = cfg.predefinedTexts.map((item, i) => `
+      <div class="text-item" style="${i === cfg.currentTextIndex ? 'border: 1px solid var(--accent);' : ''}">
+        <div class="text-num">${String(i + 1).padStart(2, '0')}</div>
+        <div class="text-info">
+          <div class="text-name">${esc(item.name)}</div>
+          <div class="text-preview">${esc(item.text.substring(0, 110)).replace(/\n/g, ' ↵ ')}</div>
+        </div>
+        <button class="del-btn" onclick="selectText(${i})">Use</button>
+        <button class="del-btn" onclick="deleteText(${i})">Remove</button>
+      </div>
+    `).join('')
+  }
+
+  function esc(t) {
+    return t.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[m])
+  }
+
+  async function addNewText() {
+    const name = document.getElementById('textName').value.trim()
+    const text = document.getElementById('textContent').value.trim()
+    if (!name) { toast('Name is required', true); return }
+    if (!text) { toast('Text is required', true); return }
+    try {
+      await window.api.addText(name, text)
+      document.getElementById('textName').value = ''
+      document.getElementById('textContent').value = ''
+      renderConfig(await window.api.getConfig())
+      toast(`Added — ${name}`)
+    } catch { toast('Failed to add', true) }
+  }
+
+  async function deleteText(idx) {
+    if (!confirm('Remove this text?')) return
+    try {
+      await window.api.removeText(idx)
+      renderConfig(await window.api.getConfig())
+      toast('Text removed')
+    } catch { toast('Failed to remove', true) }
+  }
+
+  async function selectText(idx) {
+    try {
+      await window.api.updateConfig({ currentTextIndex: idx })
+      renderConfig(await window.api.getConfig())
+      toast(`Selected text #${idx + 1}`)
+    } catch {
+      toast('Failed to select text', true)
+    }
+  }
+
+  document.getElementById('typingMode').addEventListener('change', async e => {
+    try {
+      await window.api.updateConfig({ typingMode: e.target.value })
+      updateModeDisplay(e.target.value)
+      toast('Mode updated')
+    } catch { toast('Update failed', true) }
+  })
+
+  document.getElementById('selectedText').addEventListener('change', async e => {
+    const idx = Number.parseInt(e.target.value, 10)
+    if (!Number.isInteger(idx)) return
+
+    try {
+      await window.api.updateConfig({ currentTextIndex: idx })
+      renderConfig(await window.api.getConfig())
+      toast('Selected text updated')
+    } catch {
+      toast('Failed to update selected text', true)
+    }
+  })
+
+  document.getElementById('speedSlider').addEventListener('input', async e => {
+    document.getElementById('speedValue').textContent = e.target.value + 'ms'
+    try { await window.api.updateConfig({ typingSpeed: parseInt(e.target.value) }) } catch {}
+  })
+
+  document.getElementById('shortcutInput').addEventListener('change', async e => {
+    const v = e.target.value.trim()
+    if (!v || v.includes('+')) { toast('Single key only — no combos', true); return }
+    try {
+      const c = await window.api.updateConfig({ shortcut: v })
+      document.getElementById('shortcutDisplay').textContent = c.shortcut
+      toast('Shortcut updated')
+    } catch { toast('Failed', true) }
+  })
+
+  document.getElementById('stopShortcutInput').addEventListener('change', async e => {
+    const v = e.target.value.trim()
+    if (!v || v.includes('+')) { toast('Single key only — no combos', true); return }
+    try {
+      const c = await window.api.updateConfig({ stopShortcut: v })
+      document.getElementById('stopShortcutDisplay').textContent = c.stopShortcut
+      toast('Stop shortcut updated')
+    } catch { toast('Failed', true) }
+  })
+
+  function toast(msg, isErr = false) {
+    const wrap = document.getElementById('toastWrap')
+    const el = document.createElement('div')
+    el.className = 'toast' + (isErr ? ' err' : '')
+    el.textContent = msg
+    wrap.appendChild(el)
+    setTimeout(() => {
+      el.style.opacity = '0'
+      el.style.transform = 'translateY(8px)'
+      el.style.transition = 'all 0.2s'
+      setTimeout(() => el.remove(), 220)
+    }, 3000)
+  }
+
+  window.addEventListener('DOMContentLoaded', initApp)
+
+  // ─────────────────────────────────────────────────────────────
+  // HOLD-TO-TYPE: Simulate HOLD via repeated keydown events
+  // F8 controls typing while held.
+  // ─────────────────────────────────────────────────────────────
+  const HOLD_KEY_CODE = 'F8'
+  let holdInterval = null
+
+  document.addEventListener('keydown', (event) => {
+    if (event.code === HOLD_KEY_CODE) {
+      // Prevent multiple intervals
+      if (holdInterval) return
+
+      // Send initial keydown
+      window.api.sendTypingKeyDown()
+
+      // Simulate HOLD by repeating signal every 100ms while key is physically held
+      holdInterval = setInterval(() => {
+        window.api.sendTypingKeyDown()
+      }, 100)
+
+      event.preventDefault()
+      event.stopPropagation()
+    }
+  })
+
+  document.addEventListener('keyup', (event) => {
+    if (event.code === HOLD_KEY_CODE) {
+      if (holdInterval) {
+        clearInterval(holdInterval)
+        holdInterval = null
+      }
+
+      window.api.sendTypingKeyUp()
+      event.preventDefault()
+      event.stopPropagation()
+    }
+  })
+
+</script>
+</body>
+</html>
