@@ -455,7 +455,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             globalShortcut.register(keybinds.decreaseTransparency, () => {
                 console.log('Decrease transparency shortcut triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
-                    mainWindow.webContents.send('adjust-transparency', -0.1);
+                    mainWindow.webContents.send('adjust-transparency', -0.02);
                 }
             });
             console.log(`Registered decreaseTransparency: ${keybinds.decreaseTransparency}`);
@@ -469,7 +469,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             globalShortcut.register(keybinds.increaseTransparency, () => {
                 console.log('Increase transparency shortcut triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
-                    mainWindow.webContents.send('adjust-transparency', 0.1);
+                    mainWindow.webContents.send('adjust-transparency', 0.02);
                 }
             });
             console.log(`Registered increaseTransparency: ${keybinds.increaseTransparency}`);
@@ -513,7 +513,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             globalShortcut.register(keybinds.decreaseTextOpacity, () => {
                 console.log('Decrease text opacity shortcut triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
-                    mainWindow.webContents.send('adjust-text-opacity', -0.1);
+                    mainWindow.webContents.send('adjust-text-opacity', -0.02);
                 }
             });
             console.log(`Registered decreaseTextOpacity: ${keybinds.decreaseTextOpacity}`);
@@ -527,7 +527,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             globalShortcut.register(keybinds.increaseTextOpacity, () => {
                 console.log('Increase text opacity shortcut triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
-                    mainWindow.webContents.send('adjust-text-opacity', 0.1);
+                    mainWindow.webContents.send('adjust-text-opacity', 0.02);
                 }
             });
             console.log(`Registered increaseTextOpacity: ${keybinds.increaseTextOpacity}`);

@@ -407,7 +407,7 @@ export class HelpView extends LitElement {
                         </div>
 
                         <div class="keyboard-group">
-                            <div class="keyboard-group-title">Display & Appearance</div>
+                            <div class="keyboard-group-title">Stealth & Anti-Proctoring</div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Decrease background opacity</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.decreaseTransparency)}</div>
@@ -425,6 +425,18 @@ export class HelpView extends LitElement {
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.increaseTextOpacity)}</div>
                             </div>
                             <div class="shortcut-item">
+                                <span class="shortcut-description">Toggle Navbar</span>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.toggleNavbar)}</div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Toggle Stealth Mode (Click-Through)</span>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.toggleStealth)}</div>
+                            </div>
+                        </div>
+
+                        <div class="keyboard-group">
+                            <div class="keyboard-group-title">Display & Appearance</div>
+                            <div class="shortcut-item">
                                 <span class="shortcut-description">Decrease font size</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.decreaseFontSize)}</div>
                             </div>
@@ -441,16 +453,8 @@ export class HelpView extends LitElement {
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.nextStep)}</div>
                             </div>
                             <div class="shortcut-item">
-                                <span class="shortcut-description">Toggle Navbar</span>
-                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.toggleNavbar)}</div>
-                            </div>
-                            <div class="shortcut-item">
                                 <span class="shortcut-description">Ask Stealth Clipboard</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.askClipboard)}</div>
-                            </div>
-                            <div class="shortcut-item">
-                                <span class="shortcut-description">Toggle Stealth Mode</span>
-                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.toggleStealth)}</div>
                             </div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Toggle AI provider (Gemini/Groq)</span>
@@ -491,7 +495,7 @@ export class HelpView extends LitElement {
                         </div>
 
                         <div class="keyboard-group">
-                            <div class="keyboard-group-title">Invigilator Mode</div>
+                            <div class="keyboard-group-title">Auto-Typer & Invigilator Mode</div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Toggle Invigilator Mode</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.toggleInvigilatorMode)}</div>
