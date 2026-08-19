@@ -10,10 +10,10 @@ let resizeAnimation = null;
 const RESIZE_ANIMATION_DURATION = 500; // milliseconds
 
 function createWindow(sendToRenderer, geminiSessionRef) {
-    // Get saved window size from storage, or use defaults
-    const savedSize = storage.getWindowSize();
-    let windowWidth = savedSize.width || 1100;
-    let windowHeight = savedSize.height || 800;
+    // Get saved window bounds from storage, or use defaults
+    const savedBounds = storage.getWindowBounds();
+    let windowWidth = savedBounds.width || 1100;
+    let windowHeight = savedBounds.height || 800;
 
     const mainWindow = new BrowserWindow({
         width: windowWidth,
@@ -85,22 +85,54 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     mainWindow.setResizable(true);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     
-    // Listen for window resize events and save the size
-    mainWindow.on('resized', () => {
-        const [width, height] = mainWindow.getSize();
-        storage.setWindowSize(width, height);
-    });
+    // Validate and set window position
+    let x = savedBounds.x;
+    let y = savedBounds.y;
+
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+
+    // Check if the saved position is visible on any screen
+    let isVisible = false;
+    if (x !== undefined && y !== undefined) {
+        const displays = screen.getAllDisplays();
+        for (const display of displays) {
+            const bounds = display.bounds;
+            if (
+                x >= bounds.x && x + windowWidth <= bounds.x + bounds.width &&
+                y >= bounds.y && y + windowHeight <= bounds.y + bounds.height
+            ) {
+                isVisible = true;
+                break;
+            }
+        }
+    }
+
+    // Default to top-left if no saved position or not fully visible
+    if (!isVisible) {
+        x = 0;
+        y = 0;
+    }
+
+    mainWindow.setPosition(x, y);
+
+    // Save bounds when window is moved or resized
+    const saveBounds = () => {
+        const bounds = mainWindow.getBounds();
+        storage.setWindowBounds({
+            x: bounds.x,
+            y: bounds.y,
+            width: bounds.width,
+            height: bounds.height
+        });
+    };
+
+    mainWindow.on('resized', saveBounds);
+    mainWindow.on('moved', saveBounds);
 
     // Make window invisible to screen capture and recording software
     // This is critical for the app's purpose - hiding from screen shares
     mainWindow.setContentProtection(true);
-
-    // Center window at the top of the screen
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenWidth } = primaryDisplay.workAreaSize;
-    const x = Math.floor((screenWidth - windowWidth) / 2);
-    const y = 0;
-    mainWindow.setPosition(x, y);
 
     if (process.platform === 'win32') {
         mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
@@ -165,6 +197,8 @@ function getDefaultKeybinds() {
         triggerAnswerCapture: isMac ? 'Cmd+Alt+A' : 'Ctrl+Alt+A',
         confirmAutoType: isMac ? 'Cmd+Alt+Space' : 'Ctrl+Alt+Space',
         toggleTypingMode: isMac ? 'Cmd+Shift+T' : 'Ctrl+Shift+T',
+        pauseResumeTyping: isMac ? 'Cmd+Shift+]' : 'Ctrl+Shift+]',
+        stopTyping: isMac ? 'Cmd+Alt+X' : 'Ctrl+Alt+X',
     };
 }
 
@@ -778,9 +812,53 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             console.error(`[HOTKEYS] Failed to register toggleTypingMode:`, error);
         }
     }
+
+    // Register Pause/Resume Typing (Ctrl+Alt+K / Cmd+Alt+K)
+    if (keybinds.pauseResumeTyping) {
+        try {
+            globalShortcut.register(keybinds.pauseResumeTyping, () => {
+                console.log('[HOTKEYS] Pause/Resume Typing triggered');
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    console.log('[HOTKEYS] Sending IPC: invigilator:pause-resume-typing');
+                    sendToRenderer('invigilator:pause-resume-typing');
+                }
+            });
+            console.log(`[HOTKEYS] Registered pauseResumeTyping: ${keybinds.pauseResumeTyping}`);
+        } catch (error) {
+            console.error(`[HOTKEYS] Failed to register pauseResumeTyping:`, error);
+        }
+    }
+
+    // Register Stop Typing (Ctrl+Alt+X / Cmd+Alt+X)
+    if (keybinds.stopTyping) {
+        try {
+            globalShortcut.register(keybinds.stopTyping, () => {
+                console.log('[HOTKEYS] Stop Typing triggered');
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    console.log('[HOTKEYS] Sending IPC: invigilator:stop-typing');
+                    sendToRenderer('invigilator:stop-typing');
+                }
+            });
+            console.log(`[HOTKEYS] Registered stopTyping: ${keybinds.stopTyping}`);
+        } catch (error) {
+            console.error(`[HOTKEYS] Failed to register stopTyping:`, error);
+        }
+    }
 }
 
 function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
+    ipcMain.on('update-keybinds', (event, newKeybinds) => {
+        try {
+            storage.setKeybinds(newKeybinds);
+            const defaultKeybinds = getDefaultKeybinds();
+            const mergedKeybinds = { ...defaultKeybinds, ...newKeybinds };
+            updateGlobalShortcuts(mergedKeybinds, mainWindow, sendToRenderer, geminiSessionRef);
+            console.log('Keybinds updated successfully via IPC');
+        } catch (error) {
+            console.error('Failed to update keybinds via IPC:', error);
+        }
+    });
+
     ipcMain.on('view-changed', (event, view) => {
         if (view !== 'assistant' && !mainWindow.isDestroyed()) {
             mainWindow.setIgnoreMouseEvents(false);
@@ -790,6 +868,20 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
     ipcMain.handle('window-minimize', () => {
         if (!mainWindow.isDestroyed()) {
             mainWindow.minimize();
+        }
+    });
+
+    ipcMain.on('invigilator:hide-window', () => {
+        if (!mainWindow.isDestroyed()) {
+            mainWindow.hide();
+            console.log('[IPC] Invigilator mode: hid window');
+        }
+    });
+
+    ipcMain.on('invigilator:show-window', () => {
+        if (!mainWindow.isDestroyed()) {
+            mainWindow.showInactive();
+            console.log('[IPC] Invigilator mode: showed window');
         }
     });
 

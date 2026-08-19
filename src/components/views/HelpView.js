@@ -239,17 +239,47 @@ export class HelpView extends LitElement {
     getDefaultKeybinds() {
         const isMac = cheatingDaddy.isMacOS || navigator.platform.includes('Mac');
         return {
+            // Main shortcuts (Quick Controls)
+            quickStartGroq: isMac ? 'Cmd+Shift+S' : 'Ctrl+Shift+S',
+            quickStop: isMac ? 'Alt+S' : 'Alt+S',
+            killSwitch: isMac ? 'Cmd+Shift+Delete' : 'Ctrl+Shift+Delete',
+            emergencyErase: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
+            // Window resizing
+            increaseWidth: isMac ? 'Cmd+Shift+Right' : 'Ctrl+Shift+Right',
+            decreaseWidth: isMac ? 'Cmd+Shift+Left' : 'Ctrl+Shift+Left',
+            increaseHeight: isMac ? 'Cmd+Alt+Up' : 'Ctrl+Alt+Up',
+            decreaseHeight: isMac ? 'Cmd+Alt+Down' : 'Ctrl+Alt+Down',
+            // Window control
             moveUp: isMac ? 'Alt+Up' : 'Ctrl+Up',
             moveDown: isMac ? 'Alt+Down' : 'Ctrl+Down',
             moveLeft: isMac ? 'Alt+Left' : 'Ctrl+Left',
             moveRight: isMac ? 'Alt+Right' : 'Ctrl+Right',
             toggleVisibility: isMac ? 'Cmd+\\' : 'Ctrl+\\',
             toggleClickThrough: isMac ? 'Cmd+M' : 'Ctrl+M',
+            // AI actions
             nextStep: isMac ? 'Cmd+Enter' : 'Ctrl+Enter',
+            toggleNavbar: isMac ? 'Cmd+Alt+N' : 'Ctrl+Alt+N',
             previousResponse: isMac ? 'Cmd+[' : 'Ctrl+[',
             nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
             scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
             scrollDown: isMac ? 'Cmd+Shift+Down' : 'Ctrl+Shift+Down',
+            // Appearance
+            decreaseTransparency: isMac ? 'Cmd+Alt+9' : 'Ctrl+Alt+9',
+            increaseTransparency: isMac ? 'Cmd+Alt+0' : 'Ctrl+Alt+0',
+            decreaseTextOpacity: isMac ? 'Cmd+Shift+9' : 'Ctrl+Shift+9',
+            increaseTextOpacity: isMac ? 'Cmd+Shift+0' : 'Ctrl+Shift+0',
+            decreaseFontSize: isMac ? 'Cmd+Alt+[' : 'Ctrl+Alt+[',
+            increaseFontSize: isMac ? 'Cmd+Alt+]' : 'Ctrl+Alt+]',
+            // Other
+            askClipboard: isMac ? 'Cmd+Alt+P' : 'Ctrl+Alt+P',
+            toggleStealth: isMac ? 'Cmd+Alt+L' : 'Ctrl+Alt+L',
+            // Invigilator Mode
+            toggleInvigilatorMode: isMac ? 'Cmd+Alt+M' : 'Ctrl+Alt+M',
+            triggerAnswerCapture: isMac ? 'Cmd+Alt+A' : 'Ctrl+Alt+A',
+            confirmAutoType: isMac ? 'Cmd+Alt+Space' : 'Ctrl+Alt+Space',
+            toggleTypingMode: isMac ? 'Cmd+Shift+T' : 'Ctrl+Shift+T',
+            pauseResumeTyping: isMac ? 'Cmd+Shift+]' : 'Ctrl+Shift+]',
+            stopTyping: isMac ? 'Cmd+Alt+X' : 'Ctrl+Alt+X',
         };
     }
 
@@ -303,24 +333,24 @@ export class HelpView extends LitElement {
                     <div class="option-label">
                         <span>Keyboard Shortcuts</span>
                     </div>
-                    <div class="keyboard-section">
+                    <div class="keyboard-shortcuts">
                         <div class="keyboard-group">
                             <div class="keyboard-group-title">Quick Controls</div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Quick Start Groq</span>
-                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Shift</span><span class="key">S</span></div>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.quickStartGroq)}</div>
                             </div>
                             <div class="shortcut-item">
-                                <span class="shortcut-description">Quick Stop Capture</span>
-                                <div class="shortcut-keys"><span class="key">Alt</span><span class="key">S</span></div>
+                                <span class="shortcut-description">Quick Stop</span>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.quickStop)}</div>
                             </div>
                             <div class="shortcut-item">
-                                <span class="shortcut-description">Kill Switch (Close + Save)</span>
-                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Shift</span><span class="key">Delete</span></div>
+                                <span class="shortcut-description">Kill Switch</span>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.killSwitch)}</div>
                             </div>
                             <div class="shortcut-item">
-                                <span class="shortcut-description">Toggle Navbar</span>
-                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Alt</span><span class="key">N</span></div>
+                                <span class="shortcut-description">Emergency Erase</span>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.emergencyErase)}</div>
                             </div>
                         </div>
 
@@ -360,19 +390,19 @@ export class HelpView extends LitElement {
                             <div class="keyboard-group-title">Window Resizing</div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Increase window width</span>
-                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Shift</span><span class="key">Right</span></div>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.increaseWidth)}</div>
                             </div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Decrease window width</span>
-                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Shift</span><span class="key">Left</span></div>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.decreaseWidth)}</div>
                             </div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Increase window height</span>
-                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Alt</span><span class="key">Up</span></div>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.increaseHeight)}</div>
                             </div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Decrease window height</span>
-                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Alt</span><span class="key">Down</span></div>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.decreaseHeight)}</div>
                             </div>
                         </div>
 
@@ -380,27 +410,27 @@ export class HelpView extends LitElement {
                             <div class="keyboard-group-title">Display & Appearance</div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Decrease background opacity</span>
-                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Alt</span><span class="key">9</span></div>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.decreaseTransparency)}</div>
                             </div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Increase background opacity</span>
-                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Alt</span><span class="key">0</span></div>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.increaseTransparency)}</div>
                             </div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Decrease text opacity</span>
-                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Shift</span><span class="key">9</span></div>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.decreaseTextOpacity)}</div>
                             </div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Increase text opacity</span>
-                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Shift</span><span class="key">0</span></div>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.increaseTextOpacity)}</div>
                             </div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Decrease font size</span>
-                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Alt</span><span class="key">[</span></div>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.decreaseFontSize)}</div>
                             </div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Increase font size</span>
-                                <div class="shortcut-keys"><span class="key">Ctrl</span><span class="key">Alt</span><span class="key">]</span></div>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.increaseFontSize)}</div>
                             </div>
                         </div>
 
@@ -409,6 +439,18 @@ export class HelpView extends LitElement {
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Take screenshot and ask for next step</span>
                                 <div class="shortcut-keys">${this.formatKeybind(this.keybinds.nextStep)}</div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Toggle Navbar</span>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.toggleNavbar)}</div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Ask Stealth Clipboard</span>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.askClipboard)}</div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Toggle Stealth Mode</span>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.toggleStealth)}</div>
                             </div>
                             <div class="shortcut-item">
                                 <span class="shortcut-description">Toggle AI provider (Gemini/Groq)</span>
@@ -445,6 +487,34 @@ export class HelpView extends LitElement {
                             <div class="shortcut-item">
                                 <span class="shortcut-description">New line in text input</span>
                                 <div class="shortcut-keys"><span class="key">Shift</span><span class="key">Enter</span></div>
+                            </div>
+                        </div>
+
+                        <div class="keyboard-group">
+                            <div class="keyboard-group-title">Invigilator Mode</div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Toggle Invigilator Mode</span>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.toggleInvigilatorMode)}</div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Capture Answer</span>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.triggerAnswerCapture)}</div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Confirm Auto-Type</span>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.confirmAutoType)}</div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Toggle Typing Mode</span>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.toggleTypingMode)}</div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Pause/Resume Typing</span>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.pauseResumeTyping)}</div>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-description">Stop Typing</span>
+                                <div class="shortcut-keys">${this.formatKeybind(this.keybinds.stopTyping)}</div>
                             </div>
                         </div>
                     </div>

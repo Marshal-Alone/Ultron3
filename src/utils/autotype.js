@@ -9,40 +9,100 @@
  */
 
 /**
+ * Global typing state
+ */
+export const typingState = {
+  isTyping: false,
+  isPaused: false,
+  shouldStop: false
+};
+
+export function getTypingState() {
+  return typingState;
+}
+
+/**
  * Get keyboard control object from Electron or fallback
  * @returns {Object} Keyboard control object with sendKey method
  */
 export function getKeyboardControl() {
   try {
-    // Check if we're in Electron context
-    const { BrowserWindow } = window.require ? window.require('electron').remote || {} : {};
-    
-    // Return keyboard object that uses native keyboard simulation
+    const resolveElectronModule = () => {
+      if (typeof window !== 'undefined' && typeof window.require === 'function') {
+        try {
+          return window.require('electron');
+        } catch {
+          return null;
+        }
+      }
+
+      if (typeof globalThis !== 'undefined' && typeof globalThis.require === 'function') {
+        try {
+          return globalThis.require('electron');
+        } catch {
+          return null;
+        }
+      }
+
+      if (typeof require === 'function') {
+        try {
+          return require('electron');
+        } catch {
+          return null;
+        }
+      }
+
+      return null;
+    };
+
+    const electronModule = resolveElectronModule();
+    const ipcRenderer = electronModule?.ipcRenderer || electronModule?.remote?.ipcRenderer;
+
     return {
       sendKey: async (key) => {
-        // Call main process to simulate keyboard
-        if (window.require) {
+        const normalizedKey = typeof key === 'string' ? key : String(key);
+
+        if (ipcRenderer?.invoke) {
           try {
-            const { ipcRenderer } = window.require('electron');
-            // Use invoke to wait for the key to be sent
-            await ipcRenderer.invoke('keyboard:send-key-sync', key);
-            // Add a small delay to ensure the key press is registered
-            await new Promise(resolve => setTimeout(resolve, 5));
+            await ipcRenderer.invoke('keyboard:send-key-sync', normalizedKey);
+            return;
           } catch (err) {
-            console.warn(`[AutoType] Could not send key "${key}" via IPC:`, err.message);
+            console.warn(`[AutoType] Could not send key "${normalizedKey}" via invoke:`, err?.message || err);
           }
-        } else {
-          console.log(`[AutoType] Sent key: ${key}`);
         }
+
+        if (ipcRenderer?.send) {
+          try {
+            ipcRenderer.send('keyboard:send-key', normalizedKey);
+            return;
+          } catch (err) {
+            console.warn(`[AutoType] Could not send key "${normalizedKey}" via send:`, err?.message || err);
+          }
+        }
+
+        console.log(`[AutoType] Sent key: ${normalizedKey}`);
       },
+      typeText: async (text) => {
+        if (ipcRenderer?.invoke) {
+          try {
+            await ipcRenderer.invoke('keyboard:type-text', text);
+            return;
+          } catch (err) {
+            console.warn(`[AutoType] Could not type text via invoke:`, err?.message || err);
+          }
+        }
+        console.log(`[AutoType] Typed text instantly: ${text.length} chars`);
+      }
     };
   } catch (err) {
-    console.warn('[AutoType] Failed to initialize keyboard control:', err.message);
-    // Fallback implementation
+    console.warn('[AutoType] Failed to initialize keyboard control:', err?.message || err);
     return {
       sendKey: async (key) => {
         console.log(`[AutoType] (Fallback) Sent key: ${key}`);
       },
+      typeText: async (text) => {
+        console.log(`[AutoType] (Fallback) Typed text instantly: ${text.length} chars`);
+      }
     };
   }
 }
@@ -65,9 +125,24 @@ export function createAutotyper(keyboard) {
     typeCharByChar: async (text, options = {}) => {
       const { minDelay = 40, maxDelay = 80 } = options;
       
+      typingState.isTyping = true;
+      typingState.isPaused = false;
+      typingState.shouldStop = false;
+
       console.log(`[AutoType] Starting char-by-char typing (${text.length} chars, ${minDelay}-${maxDelay}ms delays)`);
       
       for (const char of text) {
+        if (typingState.shouldStop) {
+          console.log('[AutoType] Typing stopped by user');
+          break;
+        }
+
+        while (typingState.isPaused && !typingState.shouldStop) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+
+        if (typingState.shouldStop) break;
+
         await keyboard.sendKey(char);
         
         // Randomize delay to mimic natural typing
@@ -75,6 +150,7 @@ export function createAutotyper(keyboard) {
         await new Promise(resolve => setTimeout(resolve, delay));
       }
       
+      typingState.isTyping = false;
       console.log('[AutoType] Typing complete');
     },
 
@@ -85,18 +161,26 @@ export function createAutotyper(keyboard) {
      * @returns {Promise<void>}
      */
     typeInstant: async (text, options = {}) => {
-      const { minDelay = 1, maxDelay = 1 } = options;
-      
+      typingState.isTyping = true;
+      typingState.isPaused = false;
+      typingState.shouldStop = false;
+
       console.log(`[AutoType] Starting instant typing (${text.length} chars)`);
       
-      for (const char of text) {
-        await keyboard.sendKey(char);
-        
-        // Minimal delay for instant mode
-        const delay = Math.random() * (maxDelay - minDelay) + minDelay;
-        await new Promise(resolve => setTimeout(resolve, delay));
+      if (keyboard.typeText) {
+          await keyboard.typeText(text);
+      } else {
+          for (const char of text) {
+              if (typingState.shouldStop) break;
+              while (typingState.isPaused && !typingState.shouldStop) {
+                  await new Promise(resolve => setTimeout(resolve, 50));
+              }
+              if (typingState.shouldStop) break;
+              await keyboard.sendKey(char);
+          }
       }
       
+      typingState.isTyping = false;
       console.log('[AutoType] Instant typing complete');
     },
 
@@ -111,12 +195,27 @@ export function createAutotyper(keyboard) {
     typeWordByWord: async (text, options = {}) => {
       const { charDelay = 20, wordDelay = 120 } = options;
       
+      typingState.isTyping = true;
+      typingState.isPaused = false;
+      typingState.shouldStop = false;
+
       // Split by spaces and newlines while preserving them
       const words = text.split(/( |\n|\t)/);
       
       console.log(`[AutoType] Starting word-by-word typing (${words.length} words, ${charDelay}ms char delay, ${wordDelay}ms word delay)`);
       
       for (const word of words) {
+        if (typingState.shouldStop) {
+          console.log('[AutoType] Typing stopped by user');
+          break;
+        }
+
+        while (typingState.isPaused && !typingState.shouldStop) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+
+        if (typingState.shouldStop) break;
+
         if (word === '\n') {
           await keyboard.sendKey('Enter');
           await new Promise(resolve => setTimeout(resolve, wordDelay));
@@ -129,6 +228,12 @@ export function createAutotyper(keyboard) {
         } else if (word.length > 0) {
           // Type each character in the word with charDelay
           for (const char of word) {
+            if (typingState.shouldStop) break;
+            while (typingState.isPaused && !typingState.shouldStop) {
+              await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            if (typingState.shouldStop) break;
+
             await keyboard.sendKey(char);
             await new Promise(resolve => setTimeout(resolve, charDelay));
           }
@@ -137,6 +242,7 @@ export function createAutotyper(keyboard) {
         }
       }
       
+      typingState.isTyping = false;
       console.log('[AutoType] Word-by-word typing complete');
     },
 
@@ -151,19 +257,42 @@ export function createAutotyper(keyboard) {
     typeLineByLine: async (text, options = {}) => {
       const { charDelay = 20, lineDelay = 200 } = options;
       
+      typingState.isTyping = true;
+      typingState.isPaused = false;
+      typingState.shouldStop = false;
+
       const lines = text.split('\n');
       
       console.log(`[AutoType] Starting line-by-line typing (${lines.length} lines, ${charDelay}ms char delay, ${lineDelay}ms line delay)`);
       
       for (let i = 0; i < lines.length; i++) {
+        if (typingState.shouldStop) {
+          console.log('[AutoType] Typing stopped by user');
+          break;
+        }
+
+        while (typingState.isPaused && !typingState.shouldStop) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+
+        if (typingState.shouldStop) break;
+
         const line = lines[i];
         
         // Type each character in the line
         for (const char of line) {
+          if (typingState.shouldStop) break;
+          while (typingState.isPaused && !typingState.shouldStop) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
+          if (typingState.shouldStop) break;
+
           await keyboard.sendKey(char);
           await new Promise(resolve => setTimeout(resolve, charDelay));
         }
         
+        if (typingState.shouldStop) break;
+
         // Send newline if not the last line
         if (i < lines.length - 1) {
           await keyboard.sendKey('Enter');
@@ -173,6 +302,7 @@ export function createAutotyper(keyboard) {
         await new Promise(resolve => setTimeout(resolve, lineDelay));
       }
       
+      typingState.isTyping = false;
       console.log('[AutoType] Line-by-line typing complete');
     },
 
@@ -250,4 +380,93 @@ export async function typeLineByLine(text, options = {}) {
   const keyboard = getKeyboardControl();
   const autotyper = createAutotyper(keyboard);
   return autotyper.typeLineByLine(text, options);
+}
+
+/**
+ * Stop typing
+ */
+export function stopTyping() {
+  if (typingState.isTyping) {
+    typingState.shouldStop = true;
+    typingState.isPaused = false;
+    typingState.isTyping = false;
+    console.log('[AutoType] Stop signal sent');
+
+    // Kill any running PowerShell typing process
+    try {
+      const getElectron = () => {
+        if (typeof window !== 'undefined' && typeof window.require === 'function') {
+          return window.require('electron');
+        }
+        return null;
+      };
+      const electron = getElectron();
+      if (electron?.ipcRenderer?.invoke) {
+        electron.ipcRenderer.invoke('keyboard:kill-typing').catch(() => {});
+      }
+    } catch (e) {
+      // Ignore errors - best effort kill
+    }
+  }
+}
+
+/**
+ * Pause typing
+ */
+export function pauseTyping() {
+  if (typingState.isTyping && !typingState.isPaused) {
+    typingState.isPaused = true;
+    console.log('[AutoType] Paused');
+    
+    // Pause any running PowerShell typing process
+    try {
+      const getElectron = () => {
+        if (typeof window !== 'undefined' && typeof window.require === 'function') {
+          return window.require('electron');
+        }
+        return null;
+      };
+      const electron = getElectron();
+      if (electron?.ipcRenderer?.invoke) {
+        electron.ipcRenderer.invoke('keyboard:pause-typing').catch(() => {});
+      }
+    } catch (e) {}
+  }
+}
+
+/**
+ * Resume typing
+ */
+export function resumeTyping() {
+  if (typingState.isTyping && typingState.isPaused) {
+    typingState.isPaused = false;
+    console.log('[AutoType] Resumed');
+    
+    // Resume any running PowerShell typing process
+    try {
+      const getElectron = () => {
+        if (typeof window !== 'undefined' && typeof window.require === 'function') {
+          return window.require('electron');
+        }
+        return null;
+      };
+      const electron = getElectron();
+      if (electron?.ipcRenderer?.invoke) {
+        electron.ipcRenderer.invoke('keyboard:resume-typing').catch(() => {});
+      }
+    } catch (e) {}
+  }
+}
+
+/**
+ * Toggle Pause/Resume
+ */
+export function togglePauseTyping() {
+  if (!typingState.isTyping) return;
+  
+  if (typingState.isPaused) {
+    resumeTyping();
+  } else {
+    pauseTyping();
+  }
 }

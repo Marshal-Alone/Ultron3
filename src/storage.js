@@ -13,7 +13,8 @@ const DEFAULT_CONFIG = {
 
 const DEFAULT_CREDENTIALS = {
     apiKey: '',
-    groqApiKey: ''
+    groqApiKey: '',
+    openRouterApiKey: ''
 };
 
 const DEFAULT_PREFERENCES = {
@@ -30,7 +31,9 @@ const DEFAULT_PREFERENCES = {
     aiProvider: 'gemini',  // 'gemini' or 'groq'
     // Invigilator Mode preferences
     invigilatorTypingMode: 'charByChar',  // 'charByChar' or 'instant'
-    invigilatorModeEnabled: false  // Default to disabled
+    invigilatorModeEnabled: false,  // Default to disabled
+    holdToTypeEnabled: false,
+    holdToTypeKey: '0x11,0x10,VK:]' // Default to Ctrl+Shift+]
 };
 
 const DEFAULT_KEYBINDS = null; // null means use system defaults
@@ -127,23 +130,26 @@ function needsReset() {
 function resetConfigDir() {
     const configDir = getConfigDir();
 
-    console.log('Resetting config directory...');
+    console.log('Resetting config.json (preserving preferences and credentials)...');
+    const configPath = getConfigPath();
 
-    // Remove existing directory if it exists
-    if (fs.existsSync(configDir)) {
-        fs.rmSync(configDir, { recursive: true, force: true });
+    if (fs.existsSync(configPath)) {
+        fs.unlinkSync(configPath);
     }
 
-    // Create fresh directory structure
-    fs.mkdirSync(configDir, { recursive: true });
-    fs.mkdirSync(getHistoryDir(), { recursive: true });
+    if (!fs.existsSync(configDir)) {
+        fs.mkdirSync(configDir, { recursive: true });
+    }
+    if (!fs.existsSync(getHistoryDir())) {
+        fs.mkdirSync(getHistoryDir(), { recursive: true });
+    }
 
-    // Initialize with defaults
-    writeJsonFile(getConfigPath(), DEFAULT_CONFIG);
-    writeJsonFile(getCredentialsPath(), DEFAULT_CREDENTIALS);
-    writeJsonFile(getPreferencesPath(), DEFAULT_PREFERENCES);
+    // Initialize only missing files with defaults
+    if (!fs.existsSync(getConfigPath())) writeJsonFile(getConfigPath(), DEFAULT_CONFIG);
+    if (!fs.existsSync(getCredentialsPath())) writeJsonFile(getCredentialsPath(), DEFAULT_CREDENTIALS);
+    if (!fs.existsSync(getPreferencesPath())) writeJsonFile(getPreferencesPath(), DEFAULT_PREFERENCES);
 
-    console.log('Config directory initialized with defaults');
+    console.log('Config directory initialized safely');
 }
 
 // Initialize storage - call this on app startup
@@ -198,6 +204,14 @@ function getGroqApiKey() {
 
 function setGroqApiKey(apiKey) {
     return setCredentials({ groqApiKey: apiKey });
+}
+
+function getOpenRouterApiKey() {
+    return getCredentials().openRouterApiKey || '';
+}
+
+function setOpenRouterApiKey(apiKey) {
+    return setCredentials({ openRouterApiKey: apiKey });
 }
 
 // ============ PREFERENCES ============
@@ -412,18 +426,34 @@ function deleteAllSessions() {
     }
 }
 
-// ============ WINDOW SIZE ============
+// ============ WINDOW BOUNDS ============
 
-function getWindowSize() {
+function getWindowBounds() {
     const prefs = getPreferences();
     return {
         width: prefs.windowWidth || 1100,
-        height: prefs.windowHeight || 800
+        height: prefs.windowHeight || 800,
+        x: prefs.windowX !== undefined ? prefs.windowX : undefined,
+        y: prefs.windowY !== undefined ? prefs.windowY : undefined
     };
 }
 
+function setWindowBounds(bounds) {
+    let success = true;
+    if (bounds.width !== undefined) success = success && updatePreference('windowWidth', bounds.width);
+    if (bounds.height !== undefined) success = success && updatePreference('windowHeight', bounds.height);
+    if (bounds.x !== undefined) success = success && updatePreference('windowX', bounds.x);
+    if (bounds.y !== undefined) success = success && updatePreference('windowY', bounds.y);
+    return success;
+}
+
+// Keeping for backwards compatibility if used elsewhere
+function getWindowSize() {
+    return getWindowBounds();
+}
+
 function setWindowSize(width, height) {
-    return updatePreference('windowWidth', width) && updatePreference('windowHeight', height);
+    return setWindowBounds({ width, height });
 }
 
 // ============ SCREENSHOT SAVING ============
@@ -631,6 +661,8 @@ module.exports = {
     setApiKey,
     getGroqApiKey,
     setGroqApiKey,
+    getOpenRouterApiKey,
+    setOpenRouterApiKey,
 
     // Preferences
     getPreferences,
@@ -655,9 +687,11 @@ module.exports = {
     deleteSession,
     deleteAllSessions,
 
-    // Window Size
+    // Window Bounds
     getWindowSize,
     setWindowSize,
+    getWindowBounds,
+    setWindowBounds,
 
     // Screenshots
     saveSessionScreenshot,

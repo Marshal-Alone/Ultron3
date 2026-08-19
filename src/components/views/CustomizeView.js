@@ -570,6 +570,9 @@ export class CustomizeView extends LitElement {
         clearStatusType: { type: String },
         aiProvider: { type: String },
         groqApiKey: { type: String },
+        openRouterApiKey: { type: String },
+        holdToTypeEnabled: { type: Boolean },
+        holdToTypeKey: { type: String },
     };
 
     constructor() {
@@ -616,6 +619,11 @@ export class CustomizeView extends LitElement {
         // AI Provider default
         this.aiProvider = 'gemini';
         this.groqApiKey = '';
+                this.openRouterApiKey = '';
+        this.openRouterApiKey = '';
+
+        this.holdToTypeEnabled = false;
+        this.holdToTypeKey = '0x11,0x10,VK:]';
 
         this._loadFromStorage();
     }
@@ -713,14 +721,20 @@ export class CustomizeView extends LitElement {
             this.customPrompt = prefs.customPrompt ?? '';
             this.theme = prefs.theme ?? 'dark';
             this.aiProvider = prefs.aiProvider ?? 'gemini';
+            this.holdToTypeEnabled = prefs.holdToTypeEnabled ?? false;
+            this.holdToTypeKey = prefs.holdToTypeKey ?? '0x11,0x10,VK:]';
 
             // Load Groq API key
             try {
                 const groqResult = await cheatingDaddy.storage.getGroqApiKey();
                 this.groqApiKey = groqResult || '';
+                const openRouterResult = await cheatingDaddy.storage.getOpenRouterApiKey();
+                this.openRouterApiKey = openRouterResult || '';
             } catch (e) {
                 console.log('Groq API key not available');
                 this.groqApiKey = '';
+                this.openRouterApiKey = '';
+        this.openRouterApiKey = '';
             }
 
             if (keybinds) {
@@ -886,6 +900,7 @@ export class CustomizeView extends LitElement {
             quickStartGroq: isMac ? 'Cmd+Shift+S' : 'Ctrl+Shift+S',
             quickStop: isMac ? 'Alt+S' : 'Alt+S',
             killSwitch: isMac ? 'Cmd+Shift+Delete' : 'Ctrl+Shift+Delete',
+            emergencyErase: isMac ? 'Cmd+Shift+E' : 'Ctrl+Shift+E',
             // Window resizing
             increaseWidth: isMac ? 'Cmd+Shift+Right' : 'Ctrl+Shift+Right',
             decreaseWidth: isMac ? 'Cmd+Shift+Left' : 'Ctrl+Shift+Left',
@@ -900,6 +915,7 @@ export class CustomizeView extends LitElement {
             toggleClickThrough: isMac ? 'Cmd+M' : 'Ctrl+M',
             // AI actions
             nextStep: isMac ? 'Cmd+Enter' : 'Ctrl+Enter',
+            toggleNavbar: isMac ? 'Cmd+Alt+N' : 'Ctrl+Alt+N',
             previousResponse: isMac ? 'Cmd+[' : 'Ctrl+[',
             nextResponse: isMac ? 'Cmd+]' : 'Ctrl+]',
             scrollUp: isMac ? 'Cmd+Shift+Up' : 'Ctrl+Shift+Up',
@@ -914,6 +930,13 @@ export class CustomizeView extends LitElement {
             // Other
             askClipboard: isMac ? 'Cmd+Alt+P' : 'Ctrl+Alt+P',
             toggleStealth: isMac ? 'Cmd+Alt+L' : 'Ctrl+Alt+L',
+            // Invigilator Mode
+            toggleInvigilatorMode: isMac ? 'Cmd+Alt+M' : 'Ctrl+Alt+M',
+            triggerAnswerCapture: isMac ? 'Cmd+Alt+A' : 'Ctrl+Alt+A',
+            confirmAutoType: isMac ? 'Cmd+Alt+Space' : 'Ctrl+Alt+Space',
+            toggleTypingMode: isMac ? 'Cmd+Shift+T' : 'Ctrl+Shift+T',
+            pauseResumeTyping: isMac ? 'Cmd+Shift+]' : 'Ctrl+Shift+]',
+            stopTyping: isMac ? 'Cmd+Alt+X' : 'Ctrl+Alt+X',
         };
     }
 
@@ -961,6 +984,12 @@ export class CustomizeView extends LitElement {
                 key: 'killSwitch',
                 name: 'Kill Switch',
                 description: 'Force close app with auto-save',
+                category: 'main',
+            },
+            {
+                key: 'emergencyErase',
+                name: 'Emergency Erase',
+                description: 'Erase all configuration and reset app immediately',
                 category: 'main',
             },
             // Window Resizing
@@ -1029,6 +1058,12 @@ export class CustomizeView extends LitElement {
                 key: 'nextStep',
                 name: 'Ask Next Step',
                 description: 'Take screenshot and ask AI for the next step suggestion',
+                category: 'ai',
+            },
+            {
+                key: 'toggleNavbar',
+                name: 'Toggle Navbar',
+                description: 'Show/hide the bottom navigation bar',
                 category: 'ai',
             },
             {
@@ -1101,6 +1136,43 @@ export class CustomizeView extends LitElement {
             //     name: 'Stealth Mode (Focus Lock)',
             //     description: 'Toggle window focusability to avoid detection',
             // },
+            // Invigilator Mode Shortcuts
+            {
+                key: 'toggleInvigilatorMode',
+                name: 'Toggle Invigilator Mode',
+                description: 'Enable or disable invigilator mode',
+                category: 'invigilator',
+            },
+            {
+                key: 'triggerAnswerCapture',
+                name: 'Capture Answer',
+                description: 'Take a screenshot of the question and trigger answer fetch',
+                category: 'invigilator',
+            },
+            {
+                key: 'confirmAutoType',
+                name: 'Confirm Auto-Type',
+                description: 'Start auto-typing the fetched answer',
+                category: 'invigilator',
+            },
+            {
+                key: 'toggleTypingMode',
+                name: 'Toggle Typing Mode',
+                description: 'Switch between fast (instant) and human-like typing',
+                category: 'invigilator',
+            },
+            {
+                key: 'pauseResumeTyping',
+                name: 'Pause/Resume Typing',
+                description: 'Pause or resume the auto-typing process',
+                category: 'invigilator',
+            },
+            {
+                key: 'stopTyping',
+                name: 'Stop Typing',
+                description: 'Cancel and stop the auto-typing process entirely',
+                category: 'invigilator',
+            },
             {
                 key: 'toggleAiProvider',
                 name: 'Switch AI Provider',
@@ -1215,12 +1287,23 @@ export class CustomizeView extends LitElement {
         this.requestUpdate();
     }
 
+    
+
     async handleGroqApiKeyChange(e) {
         this.groqApiKey = e.target.value;
         try {
             await cheatingDaddy.storage.setGroqApiKey(this.groqApiKey);
         } catch (error) {
             console.error('Error saving Groq API key:', error);
+        }
+    }
+
+    async handleOpenRouterApiKeyChange(e) {
+        this.openRouterApiKey = e.target.value;
+        try {
+            await cheatingDaddy.storage.setOpenRouterApiKey(this.openRouterApiKey);
+        } catch (error) {
+            console.error('Error saving OpenRouter API key:', error);
         }
     }
 
@@ -1342,6 +1425,18 @@ export class CustomizeView extends LitElement {
                 </div>
             </div>
         `;
+    }
+
+    async handleHoldToTypeToggle(e) {
+        this.holdToTypeEnabled = e.target.checked;
+        await cheatingDaddy.storage.updatePreference('holdToTypeEnabled', this.holdToTypeEnabled);
+        this.requestUpdate();
+    }
+
+    async handleHoldToTypeKeySelect(e) {
+        this.holdToTypeKey = e.target.value;
+        await cheatingDaddy.storage.updatePreference('holdToTypeKey', this.holdToTypeKey);
+        this.requestUpdate();
     }
 
     renderAudioSection() {
@@ -1535,7 +1630,8 @@ export class CustomizeView extends LitElement {
         // Categorize shortcuts
         const mainActions = allActions.filter(a => a.category === 'main');
         const resizingActions = allActions.filter(a => a.category === 'resizing');
-        const otherActions = allActions.filter(a => !a.category || (a.category !== 'main' && a.category !== 'resizing'));
+        const invigilatorActions = allActions.filter(a => a.category === 'invigilator');
+        const otherActions = allActions.filter(a => !a.category || (a.category !== 'main' && a.category !== 'resizing' && a.category !== 'invigilator'));
         
         const renderShortcutsTable = (actions, title) => html`
             <div class="shortcuts-section">
@@ -1580,12 +1676,42 @@ export class CustomizeView extends LitElement {
         
         return html`
             <div class="content-header">Keyboard Shortcuts</div>
+
+            <div class="form-grid" style="margin-bottom: 20px;">
+                <div class="form-group">
+                    <label class="form-label" style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" 
+                               .checked=${this.holdToTypeEnabled}
+                               @change=${this.handleHoldToTypeToggle} />
+                        Enable "Hold to Type" Mode
+                    </label>
+                    <div class="form-description">
+                        When enabled, Auto-Type will only type while you physically hold down the selected key below. Releasing the key instantly pauses typing.
+                    </div>
+                </div>
+                ${this.holdToTypeEnabled ? html`
+                    <div class="form-group">
+                        <label class="form-label">Hold-to-Type Key</label>
+                        <select class="form-control" .value=${this.holdToTypeKey} @change=${this.handleHoldToTypeKeySelect}>
+                            <option value="0x11,0x10,VK:]">Ctrl + Shift + ]</option>
+                            <option value="VK:]">] (Right Bracket)</option>
+                            <option value="0x77">F8</option>
+                            <option value="0x78">F9</option>
+                            <option value="0x7B">F12</option>
+                        </select>
+                    </div>
+                ` : ''}
+            </div>
+
             <div class="form-grid">
                 <!-- Main Shortcuts (Top) -->
                 ${mainActions.length > 0 ? renderShortcutsTable(mainActions, 'Main Shortcuts (Quick Controls)') : ''}
                 
                 <!-- Window Resizing -->
                 ${resizingActions.length > 0 ? renderShortcutsTable(resizingActions, 'Window Resizing') : ''}
+                
+                <!-- Invigilator Mode -->
+                ${invigilatorActions.length > 0 ? renderShortcutsTable(invigilatorActions, 'Invigilator Mode Shortcuts') : ''}
                 
                 <!-- Other Shortcuts (Bottom) -->
                 ${otherActions.length > 0 ? renderShortcutsTable(otherActions, 'Other Shortcuts') : ''}
@@ -1652,6 +1778,20 @@ export class CustomizeView extends LitElement {
                         />
                         <div class="form-description">
                             Get your API key from <a href="https://console.groq.com" target="_blank" style="color: var(--text-color);">console.groq.com</a>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>OpenRouter API Key (for Reasoning)</label>
+                        <input 
+                            type="password"
+                            class="form-control"
+                            placeholder="Enter your OpenRouter API key..."
+                            .value=${this.openRouterApiKey}
+                            @change=${this.handleOpenRouterApiKeyChange}
+                        />
+                        <div class="form-description">
+                            Get your API key from <a href="https://openrouter.ai" target="_blank" style="color: var(--text-color);">openrouter.ai</a>
                         </div>
                     </div>
                 ` : ''}
@@ -1737,3 +1877,4 @@ export class CustomizeView extends LitElement {
 }
 
 customElements.define('customize-view', CustomizeView);
+

@@ -394,15 +394,21 @@ export class AppHeader extends LitElement {
 
     render() {
         const elapsedTime = this.getElapsedTime();
-        const shouldHideHeader = this.isNavbarHidden || (this.currentView === 'assistant' && this.backgroundTransparency < 0.7);
+        const shouldHideHeader = this.isNavbarHidden && this.currentView === 'assistant';
         const headerClass = shouldHideHeader ? 'header hidden' : 'header';
-        
+
         // Get invigilator mode indicator class
-        const indicatorClass = this.invigilatorModeActive 
-            ? `invigilator-mode-indicator ${this.invigilatorTypingMode === 'instant' ? 'instant' : 'char-by-char'}`
+        const modeLabels = {
+            'charByChar': 'Char by Char',
+            'wordByWord': 'Word by Word',
+            'lineByLine': 'Line by Line',
+            'instant': 'Instant'
+        };
+        const indicatorClass = this.invigilatorModeActive
+            ? 'invigilator-mode-indicator'
             : 'invigilator-mode-indicator inactive';
-        const indicatorLabel = this.invigilatorModeActive 
-            ? `${this.invigilatorTypingMode === 'instant' ? 'Instant' : 'Char-by-Char'}`
+        const indicatorLabel = this.invigilatorModeActive
+            ? (modeLabels[this.invigilatorTypingMode] || this.invigilatorTypingMode)
             : 'Invigilator OFF';
 
         return html`

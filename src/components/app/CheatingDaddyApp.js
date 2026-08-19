@@ -8,7 +8,7 @@ import { AssistantView } from '../views/AssistantView.js';
 import { OnboardingView } from '../views/OnboardingView.js';
 import { InvigilatorPreviewView } from '../views/InvigilatorPreviewView.js';
 import { invigilatorMode } from '../../utils/invigilatorMode.js';
-import { createAutotyper, getKeyboardControl } from '../../utils/autotype.js';
+import { createAutotyper, getKeyboardControl, stopTyping, togglePauseTyping, getTypingState } from '../../utils/autotype.js';
 
 export class CheatingDaddyApp extends LitElement {
     static styles = css`
@@ -242,20 +242,9 @@ export class CheatingDaddyApp extends LitElement {
             this.requestUpdate();
         });
         
-        // Subscribe to preview show events
+        // Subscribe to preview show events (preview removed, just log)
         invigilatorMode.onPreviewShow(({ code }) => {
-            // Show preview with the code
-            this.previewVisible = true;
-            console.log(`[App] Showing preview with ${code.length} chars`);
-            this.requestUpdate();
-            
-            // Get the preview component and show the code
-            setTimeout(() => {
-                const preview = this.shadowRoot?.querySelector('invigilator-preview');
-                if (preview) {
-                    preview.show(code, 'javascript');
-                }
-            }, 0);
+            console.log(`[App] Answer captured (${code.length} chars), ready for auto-type`);
         });
     }
 
@@ -364,6 +353,9 @@ export class CheatingDaddyApp extends LitElement {
             });
             ipcRenderer.on('background-opacity-changed', (_, opacity) => {
                 this.backgroundTransparency = opacity;
+                if (this.currentView === 'assistant' && opacity < 0.7) {
+                    this.isNavbarHidden = true;
+                }
                 this.requestUpdate();
             });
             ipcRenderer.on('toggle-navbar', () => {
@@ -392,6 +384,34 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.on('invigilator:toggle-typing-mode', () => {
                 console.log('[App IPC] Received toggle-typing-mode');
                 invigilatorMode.toggleTypingMode();
+                this.setStatus(`Typing Mode: ${invigilatorMode.getState().typingMode}`);
+                
+                // Clear the status message after a few seconds
+                setTimeout(() => {
+                    if (this.statusText && this.statusText.includes('Typing Mode:')) {
+                        this.setStatus('Ready');
+                    }
+                }, 3000);
+            });
+
+            ipcRenderer.on('invigilator:pause-resume-typing', () => {
+                console.log('[App IPC] Received pause-resume-typing');
+                togglePauseTyping();
+                
+                // Show status
+                const isPaused = getTypingState().isPaused;
+                this.setStatus(isPaused ? 'Auto-Typing Paused' : 'Auto-Typing Resumed');
+            });
+
+            ipcRenderer.on('invigilator:stop-typing', () => {
+                console.log('[App IPC] Received stop-typing');
+                stopTyping();
+            });
+            
+            // Update invigilator mode state when requested
+            ipcRenderer.on('request-invigilator-state', () => {
+                const state = invigilatorMode.getState();
+                ipcRenderer.send('invigilator-state-response', state);
             });
         }
     }
@@ -492,6 +512,7 @@ export class CheatingDaddyApp extends LitElement {
     async handleClose() {
         if (this.currentView === 'customize' || this.currentView === 'help' || this.currentView === 'history') {
             this.currentView = 'main';
+            this.isNavbarHidden = false;
         } else if (this.currentView === 'assistant') {
             cheatingDaddy.stopCapture();
 
@@ -503,6 +524,7 @@ export class CheatingDaddyApp extends LitElement {
             this.sessionActive = false;
             this.isRecording = false;
             this.currentView = 'main';
+            this.isNavbarHidden = false;
             console.log('Session closed');
         } else {
             // Quit the entire application
@@ -541,6 +563,7 @@ export class CheatingDaddyApp extends LitElement {
         this.startTime = Date.now();
         this.isRecording = true;
         this.currentView = 'assistant';
+        this.isNavbarHidden = this.backgroundTransparency < 0.7;
     }
 
     // Quick Start Groq - start immediately with Groq provider
@@ -576,6 +599,7 @@ export class CheatingDaddyApp extends LitElement {
         this.startTime = Date.now();
         this.isRecording = true;
         this.currentView = 'assistant';
+        this.isNavbarHidden = this.backgroundTransparency < 0.7;
     }
 
     // Quick Stop - stop capture and close session immediately
@@ -594,6 +618,7 @@ export class CheatingDaddyApp extends LitElement {
             this.sessionActive = false;
             this.isRecording = false;
             this.currentView = 'main';
+            this.isNavbarHidden = false;
             console.log('Session closed via quick stop');
         }
     }
@@ -628,6 +653,7 @@ export class CheatingDaddyApp extends LitElement {
 
     handleBackClick() {
         this.currentView = 'main';
+        this.isNavbarHidden = false;
         this.requestUpdate();
     }
 
@@ -705,13 +731,26 @@ export class CheatingDaddyApp extends LitElement {
     async _handleConfirmAutotype() {
         console.log('[App] Confirm Auto-Type triggered');
         
+        // If we are already typing, ignore the command to avoid restarting or toggling
+        const currentTypingState = getTypingState();
+        if (currentTypingState && currentTypingState.isTyping) {
+            console.log('[App] Auto-Type is active, ignoring start command');
+            return;
+        }
+
         // Get the captured answer code from invigilator mode state
-        const answerCode = invigilatorMode.getState().lastAnswerCode;
+        let answerCode = invigilatorMode.getState().lastAnswerCode;
         const typingMode = invigilatorMode.getState().typingMode;
         
         if (!answerCode) {
-            console.warn('[App] No answer code available for auto-typing');
-            return;
+            // Fallback to the currently displayed AI response if available
+            if (this.responses && this.responses.length > 0 && this.currentResponseIndex >= 0) {
+                answerCode = this.responses[this.currentResponseIndex];
+                console.log('[App] Falling back to current AI response for auto-typing');
+            } else {
+                console.warn('[App] No answer code available for auto-typing');
+                return;
+            }
         }
         
         try {
@@ -743,10 +782,6 @@ export class CheatingDaddyApp extends LitElement {
             
             console.log('[App] Auto-typing completed successfully');
             
-            // Hide the preview after successful typing
-            this.previewVisible = false;
-            this.requestUpdate();
-            
             // Keep app visible so user can see what was typed
             // Response to any errors will be logged but app continues
         } catch (error) {
@@ -759,9 +794,17 @@ export class CheatingDaddyApp extends LitElement {
         super.updated(changedProperties);
 
         // Only notify main process of view change if the view actually changed
-        if (changedProperties.has('currentView') && window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.send('view-changed', this.currentView);
+        if (changedProperties.has('currentView')) {
+            if (this.currentView !== 'assistant') {
+                this.isNavbarHidden = false;
+            } else if (this.backgroundTransparency < 0.7) {
+                this.isNavbarHidden = true;
+            }
+
+            if (window.require) {
+                const { ipcRenderer } = window.require('electron');
+                ipcRenderer.send('view-changed', this.currentView);
+            }
 
             // Add a small delay to smooth out the transition
             const viewContainer = this.shadowRoot?.querySelector('.view-container');
@@ -879,11 +922,6 @@ export class CheatingDaddyApp extends LitElement {
                         <div class="view-container">${this.renderCurrentView()}</div>
                     </div>
                 </div>
-                <!-- Invigilator Mode Preview Component -->
-                <invigilator-preview
-                    ?isVisible=${this.previewVisible}
-                    .typingMode=${this.invigilatorTypingMode}
-                ></invigilator-preview>
             </div>
         `;
     }

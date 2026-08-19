@@ -40,9 +40,15 @@ describe('Invigilator Mode State Manager', () => {
   });
 
   describe('toggleTypingMode', () => {
-    it('alternates between charByChar and instant', () => {
+    it('cycles through the supported typing modes', () => {
       expect(manager.typingMode).toBe('charByChar');
       
+      manager.toggleTypingMode();
+      expect(manager.typingMode).toBe('wordByWord');
+      
+      manager.toggleTypingMode();
+      expect(manager.typingMode).toBe('lineByLine');
+
       manager.toggleTypingMode();
       expect(manager.typingMode).toBe('instant');
       
@@ -132,7 +138,7 @@ describe('Invigilator Mode State Manager', () => {
       
       manager.toggleTypingMode();
       
-      expect(callback).toHaveBeenCalledWith({ typingMode: 'instant' });
+      expect(callback).toHaveBeenCalledWith({ typingMode: 'wordByWord' });
     });
   });
 

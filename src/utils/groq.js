@@ -61,15 +61,25 @@ class GroqAIService {
             // Stream responses to renderer (matching Gemini pattern)
             let fullText = '';
             let isFirst = true;
+            let lastSendTime = Date.now();
 
             for await (const chunk of stream) {
                 const chunkText = chunk.choices[0]?.delta?.content || '';
                 if (chunkText) {
                     fullText += chunkText;
-                    // Send to renderer - new response for first chunk, update for subsequent
-                    sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
-                    isFirst = false;
+
+                    const now = Date.now();
+                    if (isFirst || now - lastSendTime > 100) {
+                        // Send to renderer - new response for first chunk, update for subsequent
+                        sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
+                        isFirst = false;
+                        lastSendTime = now;
+                    }
                 }
+            }
+
+            if (!isFirst && fullText.length > 0) {
+                sendToRenderer('update-response', fullText);
             }
 
             console.log(`Text response completed from Groq ${modelName}`);
@@ -104,49 +114,141 @@ class GroqAIService {
      * @returns {Promise<{success: boolean, text?: string, error?: string, model: string}>}
      */
     async analyzeScreenshot(base64Data, prompt) {
-        const modelName = 'llama-4-scout-17b-16e-instruct';
+        const visionModelName = 'qwen/qwen3.6-27b';
+        const initialSolveModelName = 'openai/gpt-oss-120b';
+        const verificationModelName = 'openai/gpt-oss-120b';
 
         try {
             const client = this.getClient();
 
-            // Convert raw base64 to data URL format
             const imageUrl = `data:image/jpeg;base64,${base64Data}`;
 
-            console.log('\n[SCREENSHOT] PROMPT SENT TO AI:');
-            console.log('-'.repeat(70));
-            console.log(prompt);
-            console.log('-'.repeat(70) + '\n');
+            console.log('\n[SCREENSHOT] PIPELINE STAGE 1: VISION EXTRACTION');
+            sendToRenderer('new-response', 'Analyzing image and extracting code (Stage 1/3)...');
 
-            // Use streaming for real-time response display
-            const stream = await client.chat.completions.create({
-                model: `meta-llama/${modelName}`,
+            const visionResponse = await client.chat.completions.create({
+                model: visionModelName,
                 messages: [
                     {
                         role: 'user',
                         content: [
-                            { type: 'text', text: prompt },
+                            { type: 'text', text: 'Extract all the code and the exact question/problem statement from this image. Return only the raw text, no extra commentary.' },
                             { type: 'image_url', image_url: { url: imageUrl } }
                         ]
                     }
                 ],
-                max_tokens: 1500,
-                temperature: 0.2,
-                stream: true,  // Enable streaming
+                max_tokens: 2048,
+                temperature: 0.1,
             });
 
-            // Stream responses to renderer (matching Gemini pattern)
+            const extractedText = visionResponse.choices[0]?.message?.content || '';
+
+            console.log('--- Extracted Text ---');
+            console.log(extractedText);
+            console.log('----------------------\n');
+
+            console.log('[SCREENSHOT] PIPELINE STAGE 2: INITIAL SOLVE');
+            console.log('-'.repeat(70));
+            console.log(prompt);
+            console.log('-'.repeat(70) + '\n');
+
+            sendToRenderer('new-response', 'Generating initial solution (Stage 2/3)...\n\n');
+
+            const stream = await client.chat.completions.create({
+                model: initialSolveModelName,
+                messages: [
+                    {
+                        role: 'system',
+                        content: `You are an AI coding assistant. Follow these user instructions strictly and exactly:\n${prompt}`
+                    },
+                    {
+                        role: 'user',
+                        content: `Here is the text/code extracted from an image:\n\n${extractedText}\n\nSolve the problem or answer the question according to the system instructions. Explain your reasoning first step-by-step, then give the final code.`
+                    }
+                ],
+                max_tokens: 2048,
+                temperature: 0.2,
+                stream: true,
+            });
+
             let fullText = '';
             let isFirst = true;
+            let lastSendTime = Date.now();
 
             for await (const chunk of stream) {
                 const chunkText = chunk.choices[0]?.delta?.content || '';
                 if (chunkText) {
                     fullText += chunkText;
-                    // Send to renderer - new response for first chunk, update for subsequent
-                    sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
-                    isFirst = false;
+
+                    // Filter out reasoning blocks commonly produced by OSS reasoning models
+                    let displayText = fullText.replace(/<think>[\s\S]*?<\/think>\n*/g, '');
+                    displayText = displayText.replace(/<think>[\s\S]*$/g, '');
+                    displayText = displayText.trimStart();
+
+                    // Only update the renderer if there's actual text outside the think block
+                    if (displayText.length > 0) {
+                        const now = Date.now();
+                        if (isFirst || now - lastSendTime > 100) {
+                            sendToRenderer(isFirst ? 'new-response' : 'update-response', displayText);
+                            isFirst = false;
+                            lastSendTime = now;
+                        }
+                    }
                 }
             }
+
+            // Ensure the final text is sent
+            let initialSolution = fullText.replace(/<think>[\s\S]*?<\/think>\n*/g, '').trimStart();
+            if (initialSolution.length > 0 && !isFirst) {
+                sendToRenderer('update-response', initialSolution);
+            }
+
+            console.log('[SCREENSHOT] PIPELINE STAGE 3: VERIFICATION');
+            sendToRenderer('update-response', initialSolution + '\n\n---\n*Verifying solution... (Stage 3/3)*\n');
+
+            const verifyStream = await client.chat.completions.create({
+                model: verificationModelName,
+                messages: [
+                    {
+                        role: 'user',
+                        content: `Problem:\n${extractedText}\n\nProposed solution:\n${initialSolution}\n\nCarefully verify this is correct according to these instructions: ${prompt}\n\nIf there's a bug, fix it and give the corrected code. If it's completely correct, just return the exact same code with no changes. Explain your reasoning first step-by-step.`
+                    }
+                ],
+                max_tokens: 2048,
+                temperature: 0.2,
+                stream: true,
+            });
+
+            let verifiedText = '';
+            let isVerifyFirst = true;
+            let lastVerifySendTime = Date.now();
+
+            for await (const chunk of verifyStream) {
+                const chunkText = chunk.choices[0]?.delta?.content || '';
+                if (chunkText) {
+                    verifiedText += chunkText;
+
+                    let displayVerifiedText = verifiedText.replace(/<think>[\s\S]*?<\/think>\n*/g, '');
+                    displayVerifiedText = displayVerifiedText.replace(/<think>[\s\S]*$/g, '');
+                    displayVerifiedText = displayVerifiedText.trimStart();
+
+                    if (displayVerifiedText.length > 0) {
+                        const now = Date.now();
+                        if (isVerifyFirst || now - lastVerifySendTime > 100) {
+                            sendToRenderer('update-response', initialSolution + '\n\n---\n**Verified Solution:**\n\n' + displayVerifiedText);
+                            isVerifyFirst = false;
+                            lastVerifySendTime = now;
+                        }
+                    }
+                }
+            }
+
+            let finalVerifiedText = verifiedText.replace(/<think>[\s\S]*?<\/think>\n*/g, '').trimStart();
+            if (finalVerifiedText.length > 0) {
+                sendToRenderer('update-response', initialSolution + '\n\n---\n**Verified Solution:**\n\n' + finalVerifiedText);
+            }
+
+            let finalOutput = initialSolution + '\n\n---\n**Verified Solution:**\n\n' + finalVerifiedText;
 
             // Image response received
 
@@ -154,26 +256,26 @@ class GroqAIService {
             try {
                 const geminiModule = require('./gemini');
                 if (geminiModule.saveScreenAnalysis && typeof geminiModule.saveScreenAnalysis === 'function') {
-                    geminiModule.saveScreenAnalysis(prompt, fullText, `groq-${modelName}`);
+                    geminiModule.saveScreenAnalysis(prompt, finalOutput, `groq-${verificationModelName}`);
                     // Screen analysis saved
                 } else {
-                    console.warn('⚠️ saveScreenAnalysis function not available in gemini module');
+                    console.warn('s,? saveScreenAnalysis function not available in gemini module');
                 }
             } catch (e) {
-                console.error('❌ Could not save screen analysis to history:', e.message);
+                console.error('?O Could not save screen analysis to history:', e.message);
             }
 
             // Also save as conversation turn (for Q&A history)
             try {
                 const geminiModule = require('./gemini');
                 if (geminiModule.saveConversationTurn && typeof geminiModule.saveConversationTurn === 'function') {
-                    geminiModule.saveConversationTurn('Screen Analysis', fullText);
-                    console.log('✅ Screen analysis turn saved to Q&A history');
+                    geminiModule.saveConversationTurn('Screen Analysis', finalOutput);
+                    console.log('o. Screen analysis turn saved to Q&A history');
                 } else {
-                    console.warn('⚠️ saveConversationTurn function not available');
+                    console.warn('s,? saveConversationTurn function not available');
                 }
             } catch (e) {
-                console.error('❌ Could not save screen analysis turn:', e.message);
+                console.error('?O Could not save screen analysis turn:', e.message);
             }
 
             // Save screenshot image to disk with AI response
@@ -182,23 +284,23 @@ class GroqAIService {
                 const sessionId = geminiModule.getCurrentSessionId ? geminiModule.getCurrentSessionId() : null;
                 if (sessionId) {
                     const storage = require('../storage');
-                    const result = storage.saveSessionScreenshot(base64Data, sessionId, fullText);
+                    const result = storage.saveSessionScreenshot(base64Data, sessionId, finalOutput);
                     if (result.success) {
                         // Screenshot saved
                     } else {
-                        console.warn(`⚠️ Could not save screenshot image: ${result.error}`);
+                        console.warn(`s,? Could not save screenshot image: ${result.error}`);
                     }
                 }
             } catch (e) {
-                console.error('❌ Could not save screenshot image:', e.message);
+                console.error('?O Could not save screenshot image:', e.message);
             }
 
-            return { success: true, text: fullText, model: `groq-${modelName}` };
+            return { success: true, text: finalOutput, model: `groq-${verificationModelName}` };
         } catch (error) {
             console.error('Groq API error:', error);
             // Send error to renderer so user sees it
             sendToRenderer('new-response', `Error: ${error.message}`);
-            return { success: false, error: error.message, model: `groq-${modelName}` };
+            return { success: false, error: error.message, model: `groq-${initialSolveModelName}->${verificationModelName}` };
         }
     }
 }
@@ -206,3 +308,4 @@ class GroqAIService {
 const groqAI = new GroqAIService();
 
 module.exports = { groqAI, GroqAIService, sendToRenderer };
+

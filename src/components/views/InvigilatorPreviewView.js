@@ -265,9 +265,13 @@ export class InvigilatorPreviewView extends LitElement {
    * Get typing mode display label
    */
   getTypingModeLabel() {
-    return this.typingMode === 'instant' 
-      ? '⚡ Instant' 
-      : '⌨️ Char-by-Char';
+    const labels = {
+      'charByChar': 'Char by Char',
+      'wordByWord': 'Word by Word',
+      'lineByLine': 'Line by Line',
+      'instant': 'Instant'
+    };
+    return labels[this.typingMode] || this.typingMode;
   }
 
   render() {

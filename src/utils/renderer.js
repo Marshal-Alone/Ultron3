@@ -56,6 +56,13 @@ const storage = {
     async setGroqApiKey(apiKey) {
         return ipcRenderer.invoke('storage:set-groq-api-key', apiKey);
     },
+    async getOpenRouterApiKey() {
+        const result = await ipcRenderer.invoke('storage:get-openrouter-api-key');
+        return result.success ? result.data : '';
+    },
+    async setOpenRouterApiKey(apiKey) {
+        return ipcRenderer.invoke('storage:set-openrouter-api-key', apiKey);
+    },
 
     // Preferences
     async getPreferences() {

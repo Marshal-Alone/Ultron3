@@ -218,6 +218,49 @@ describe('Auto-Type Engine', () => {
       expect(keyboard).toBeDefined();
       expect(typeof keyboard.sendKey).toBe('function');
     });
+
+    it('uses the global require fallback when window.require is unavailable', async () => {
+      const invoke = vi.fn().mockResolvedValue(true);
+      const electron = { ipcRenderer: { invoke } };
+      const originalWindowRequire = typeof window !== 'undefined' ? window.require : undefined;
+      const originalGlobalRequire = typeof globalThis !== 'undefined' ? globalThis.require : undefined;
+
+      if (typeof window !== 'undefined') {
+        Object.defineProperty(window, 'require', {
+          configurable: true,
+          value: undefined,
+        });
+      }
+      if (typeof globalThis !== 'undefined') {
+        globalThis.require = vi.fn(() => electron);
+      }
+
+      try {
+        const keyboard = getKeyboardControl();
+        await keyboard.sendKey('a');
+
+        expect(invoke).toHaveBeenCalledWith('keyboard:send-key-sync', 'a');
+      } finally {
+        if (typeof window !== 'undefined') {
+          if (originalWindowRequire === undefined) {
+            delete window.require;
+          } else {
+            Object.defineProperty(window, 'require', {
+              configurable: true,
+              value: originalWindowRequire,
+            });
+          }
+        }
+
+        if (typeof globalThis !== 'undefined') {
+          if (originalGlobalRequire === undefined) {
+            delete globalThis.require;
+          } else {
+            globalThis.require = originalGlobalRequire;
+          }
+        }
+      }
+    });
   });
 
   describe('console logging', () => {

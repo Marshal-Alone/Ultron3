@@ -228,7 +228,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
     try {
         const session = await client.live.connect({
-            model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+            model: 'gemini-2.5-flash-native-audio-latest',
             callbacks: {
                 onopen: function () {
                     sendToRenderer('update-status', 'Live session connected');
@@ -263,9 +263,8 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
                     // Handle text responses via modelTurn.parts (for text-based responses)
                     if (message.serverContent?.modelTurn?.parts) {
-                        console.log('modelTurn parts:', message.serverContent.modelTurn.parts);
                         for (const part of message.serverContent.modelTurn.parts) {
-                            if (part.text) {
+                            if (part.text && !part.thought) {
                                 const isNewResponse = messageBuffer === '';
                                 messageBuffer += part.text;
                                 sendToRenderer(isNewResponse ? 'new-response' : 'update-response', messageBuffer);
@@ -319,7 +318,6 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             },
             config: {
                 responseModalities: [Modality.AUDIO],
-                proactivity: { proactiveAudio: true },
                 outputAudioTranscription: {},
                 tools: enabledTools,
                 // Enable speaker diarization
