@@ -4,7 +4,7 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
     packagerConfig: {
         asar: true,
-        extraResource: ['./src/assets/SystemAudioDump'],
+        extraResource: ['./src/assets/SystemAudioDump', './src/utils/AutoTyper.exe'],
         name: 'audiodg',
         icon: 'src/assets/jarvis_icon',
         // use `security find-identity -v -p codesigning` to find your identity

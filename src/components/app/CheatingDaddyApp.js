@@ -739,22 +739,39 @@ export class CheatingDaddyApp extends LitElement {
         }
 
         // Get the captured answer code from invigilator mode state
-        let answerCode = invigilatorMode.getState().lastAnswerCode;
-        const typingMode = invigilatorMode.getState().typingMode;
+        let rawAnswer = invigilatorMode.getState().lastAnswerCode;
+        const typingMode = invigilatorMode.getState().typingMode || 'charByChar';
         
-        if (!answerCode) {
+        if (!rawAnswer) {
             // Fallback to the currently displayed AI response if available
             if (this.responses && this.responses.length > 0 && this.currentResponseIndex >= 0) {
-                answerCode = this.responses[this.currentResponseIndex];
+                rawAnswer = this.responses[this.currentResponseIndex];
                 console.log('[App] Falling back to current AI response for auto-typing');
             } else {
                 console.warn('[App] No answer code available for auto-typing');
+                this.setStatus('No code to type');
+                setTimeout(() => this.setStatus('Ready'), 3000);
                 return;
             }
+        }
+
+        // If response is wrapped in markdown code blocks, extract the code content
+        let answerCode = rawAnswer;
+        const codeBlockRegex = /```(?:[a-zA-Z0-9_-]*\n)?([\s\S]*?)```/g;
+        const matches = [...rawAnswer.matchAll(codeBlockRegex)];
+        if (matches.length > 0) {
+            answerCode = matches.map(m => m[1].trim()).join('\n\n');
+            console.log('[App] Extracted code from markdown code block(s)');
+        }
+
+        if (!answerCode || answerCode.trim().length === 0) {
+            console.warn('[App] Empty code text');
+            return;
         }
         
         try {
             console.log(`[App] Starting auto-type with mode: ${typingMode} (${answerCode.length} chars)`);
+            this.setStatus(`Typing (${typingMode})...`);
             
             // Get keyboard control object
             const keyboard = getKeyboardControl();
@@ -781,12 +798,12 @@ export class CheatingDaddyApp extends LitElement {
             }
             
             console.log('[App] Auto-typing completed successfully');
-            
-            // Keep app visible so user can see what was typed
-            // Response to any errors will be logged but app continues
+            this.setStatus('Typing complete');
+            setTimeout(() => this.setStatus('Ready'), 3000);
         } catch (error) {
             console.error('[App] Auto-type execution failed:', error);
-            // Preview remains visible so user can manually copy/type
+            this.setStatus('Auto-type error: ' + error.message);
+            setTimeout(() => this.setStatus('Ready'), 4000);
         }
     }
 

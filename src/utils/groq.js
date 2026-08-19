@@ -36,7 +36,7 @@ class GroqAIService {
      * @returns {Promise<{success: boolean, text?: string, error?: string, model: string}>}
      */
     async sendTextMessage(prompt, systemPrompt = null) {
-        const modelName = 'llama-3.3-70b-versatile';
+        const modelName = 'openai/gpt-oss-120b';
 
         try {
             const client = this.getClient();
@@ -163,7 +163,7 @@ class GroqAIService {
                     },
                     {
                         role: 'user',
-                        content: `Here is the text/code extracted from an image:\n\n${extractedText}\n\nSolve the problem or answer the question according to the system instructions. Explain your reasoning first step-by-step, then give the final code.`
+                        content: `Here is the text/code extracted from an image:\n\n${extractedText}\n\nSolve the problem or answer the question according to the system instructions. Explain your reasoning first step-by-step, then give the final code.\n\nCRITICAL RULES FOR FINAL CODE:\n1. If the image shows an online editor with a pre-defined class or method (like LeetCode/HackerRank), output ONLY the exact logic needed to fill in the blanks or complete the method. Do NOT rewrite the existing class or method signatures.\n2. Do NOT include any comments in your code.\n3. Output only the pure code inside a single markdown code block.`
                     }
                 ],
                 max_tokens: 2048,
@@ -211,7 +211,7 @@ class GroqAIService {
                 messages: [
                     {
                         role: 'user',
-                        content: `Problem:\n${extractedText}\n\nProposed solution:\n${initialSolution}\n\nCarefully verify this is correct according to these instructions: ${prompt}\n\nIf there's a bug, fix it and give the corrected code. If it's completely correct, just return the exact same code with no changes. Explain your reasoning first step-by-step.`
+                        content: `Problem:\n${extractedText}\n\nProposed solution:\n${initialSolution}\n\nCarefully verify this is correct according to these instructions: ${prompt}\n\nIf there's a bug, fix it and give the corrected code. If it's completely correct, just return the exact same code with no changes. Explain your reasoning first step-by-step.\n\nCRITICAL RULES FOR FINAL CODE:\n1. If the image shows an online editor with a pre-defined class or method (like LeetCode/HackerRank), output ONLY the exact logic needed to fill in the blanks or complete the method. Do NOT rewrite the existing class or method signatures.\n2. Do NOT include any comments in your code.\n3. Output only the pure code inside a single markdown code block.`
                     }
                 ],
                 max_tokens: 2048,

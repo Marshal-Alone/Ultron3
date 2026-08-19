@@ -2,7 +2,7 @@ if (require('electron-squirrel-startup')) {
     process.exit(0);
 }
 
-const { app, BrowserWindow, shell, ipcMain, clipboard } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, clipboard, screen, globalShortcut } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const storage = require('./storage');
@@ -384,56 +384,177 @@ function setupGeneralIpcHandlers() {
     });
 
     // ============ KEYBOARD SIMULATION ============
-    // Handle keyboard key sending for auto-type feature
+    // Helper PowerShell C# snippet for SendInput
+    const winInputCSharp = `
+        using System;
+        using System.Runtime.InteropServices;
+        public class Keyboard {
+            [DllImport("user32.dll")]
+            public static extern short GetAsyncKeyState(int vKey);
+        }
+        public class KeyMap {
+            [DllImport("user32.dll")]
+            public static extern short VkKeyScan(char ch);
+        }
+        public class WinInput {
+            [StructLayout(LayoutKind.Sequential)]
+            public struct INPUT {
+                public uint type;
+                public KEYBDINPUT ki;
+            }
+            [StructLayout(LayoutKind.Sequential)]
+            public struct KEYBDINPUT {
+                public ushort wVk;
+                public ushort wScan;
+                public uint dwFlags;
+                public uint time;
+                public IntPtr dwExtraInfo;
+            }
+            [DllImport("user32.dll")]
+            public static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+            const uint INPUT_KEYBOARD = 1;
+            const uint KEYEVENTF_KEYUP = 0x0002;
+            const uint KEYEVENTF_UNICODE = 0x0004;
+
+            public static void SendKey(string key) {
+                if (string.IsNullOrEmpty(key)) return;
+
+                ushort vk = 0;
+                if (key == "Enter" || key == "\\n") vk = 0x0D;
+                else if (key == "Tab" || key == "\\t") vk = 0x09;
+                else if (key == "Backspace") vk = 0x08;
+                else if (key == "Delete") vk = 0x2E;
+                else if (key == "Escape") vk = 0x1B;
+                else if (key == "Home") vk = 0x24;
+                else if (key == "End") vk = 0x23;
+                else if (key == "PageUp") vk = 0x21;
+                else if (key == "PageDown") vk = 0x22;
+                else if (key == "ArrowUp") vk = 0x26;
+                else if (key == "ArrowDown") vk = 0x28;
+                else if (key == "ArrowLeft") vk = 0x25;
+                else if (key == "ArrowRight") vk = 0x27;
+
+                if (vk != 0) {
+                    SendVk(vk);
+                } else {
+                    foreach (char c in key) {
+                        SendChar(c);
+                    }
+                }
+            }
+
+            public static void SendChar(char ch) {
+                if (ch == '\\r') return;
+                if (ch == '\\n') { SendVk(0x0D); return; }
+                if (ch == '\\t') { SendVk(0x09); return; }
+
+                short vkCode = KeyMap.VkKeyScan(ch);
+                if (vkCode == -1) {
+                    // Fallback to unicode for unknown characters
+                    INPUT[] uInputs = new INPUT[2];
+                    uInputs[0].type = INPUT_KEYBOARD;
+                    uInputs[0].ki.wVk = 0;
+                    uInputs[0].ki.wScan = (ushort)ch;
+                    uInputs[0].ki.dwFlags = KEYEVENTF_UNICODE;
+                    uInputs[1].type = INPUT_KEYBOARD;
+                    uInputs[1].ki.wVk = 0;
+                    uInputs[1].ki.wScan = (ushort)ch;
+                    uInputs[1].ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
+                    SendInput(2, uInputs, Marshal.SizeOf(typeof(INPUT)));
+                    return;
+                }
+
+                ushort vk = (ushort)(vkCode & 0xFF);
+                bool shift = (vkCode & 0x0100) != 0;
+
+                int numInputs = 2;
+                if (shift) numInputs += 2;
+
+                INPUT[] inputs = new INPUT[numInputs];
+                int i = 0;
+
+                if (shift) {
+                    inputs[i].type = INPUT_KEYBOARD;
+                    inputs[i].ki.wVk = 0x10; // VK_SHIFT
+                    inputs[i].ki.wScan = 0;
+                    inputs[i].ki.dwFlags = 0;
+                    i++;
+                }
+
+                inputs[i].type = INPUT_KEYBOARD;
+                inputs[i].ki.wVk = vk;
+                inputs[i].ki.wScan = 0;
+                inputs[i].ki.dwFlags = 0;
+                i++;
+
+                inputs[i].type = INPUT_KEYBOARD;
+                inputs[i].ki.wVk = vk;
+                inputs[i].ki.wScan = 0;
+                inputs[i].ki.dwFlags = KEYEVENTF_KEYUP;
+                i++;
+
+                if (shift) {
+                    inputs[i].type = INPUT_KEYBOARD;
+                    inputs[i].ki.wVk = 0x10;
+                    inputs[i].ki.wScan = 0;
+                    inputs[i].ki.dwFlags = KEYEVENTF_KEYUP;
+                    i++;
+                }
+
+                SendInput((uint)numInputs, inputs, Marshal.SizeOf(typeof(INPUT)));
+            }
+
+            public static void SendVk(ushort vk) {
+                INPUT[] inputs = new INPUT[2];
+                inputs[0].type = INPUT_KEYBOARD;
+                inputs[0].ki.wVk = vk;
+                inputs[0].ki.wScan = 0;
+                inputs[0].ki.dwFlags = 0;
+
+                inputs[1].type = INPUT_KEYBOARD;
+                inputs[1].ki.wVk = vk;
+                inputs[1].ki.wScan = 0;
+                inputs[1].ki.dwFlags = KEYEVENTF_KEYUP;
+
+                SendInput(2, inputs, Marshal.SizeOf(typeof(INPUT)));
+            }
+
+            public static void SendVkCombo(ushort modifierVk, ushort keyVk) {
+                INPUT[] inputs = new INPUT[4];
+                inputs[0].type = INPUT_KEYBOARD;
+                inputs[0].ki.wVk = modifierVk;
+                inputs[0].ki.dwFlags = 0;
+
+                inputs[1].type = INPUT_KEYBOARD;
+                inputs[1].ki.wVk = keyVk;
+                inputs[1].ki.dwFlags = 0;
+
+                inputs[2].type = INPUT_KEYBOARD;
+                inputs[2].ki.wVk = keyVk;
+                inputs[2].ki.dwFlags = KEYEVENTF_KEYUP;
+
+                inputs[3].type = INPUT_KEYBOARD;
+                inputs[3].ki.wVk = modifierVk;
+                inputs[3].ki.dwFlags = KEYEVENTF_KEYUP;
+
+                SendInput(4, inputs, Marshal.SizeOf(typeof(INPUT)));
+            }
+        }
+    `;
+
+    // Handle keyboard key sending for auto-type feature (async fire-and-forget)
     ipcMain.on('keyboard:send-key', (event, key) => {
         try {
             console.log(`[KEYBOARD] Sending key: ${key}`);
+            const escapedKey = String(key).replace(/'/g, "''").replace(/\\/g, '\\\\');
+            const psCommand = `Add-Type -TypeDefinition @'\n${winInputCSharp}\n'@; [WinInput]::SendKey('${escapedKey}')`;
             
-            // Map special key names and characters for SendKeys method
-            const sendKeysMap = {
-                'Enter': '{ENTER}',
-                'Tab': '{TAB}',
-                'Backspace': '{BACKSPACE}',
-                'Delete': '{DELETE}',
-                'Escape': '{ESCAPE}',
-                'Home': '{HOME}',
-                'End': '{END}',
-                'PageUp': '{PAGEUP}',
-                'PageDown': '{PAGEDOWN}',
-                'ArrowUp': '{UP}',
-                'ArrowDown': '{DOWN}',
-                'ArrowLeft': '{LEFT}',
-                'ArrowRight': '{RIGHT}',
-                '+': '{+}',
-                '^': '{^}',
-                '%': '{%}',
-                '~': '{~}',
-                '(': '{(}',
-                ')': '{)}',
-                '{': '{{}',
-                '}': '{}}',
-                '[': '{[}',
-                ']': '{]}',
-                '\n': '{ENTER}',
-                '\t': '{TAB}'
-            };
-            
-            // Convert key using map, or use as-is
-            let mappedKey = key;
-            if (sendKeysMap[key]) {
-                mappedKey = sendKeysMap[key];
-            }
-            
-            // Create PowerShell command with proper escaping
-            const escapedKey = mappedKey.replace(/'/g, "''").replace(/\$/g, '`$');
-            const psCommand = `[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; [System.Windows.Forms.SendKeys]::SendWait('${escapedKey}')`;
-            
-            // Execute PowerShell command
             execFile('powershell.exe', ['-NoProfile', '-Command', psCommand], 
                 { timeout: 2000 }, 
                 (error, stdout, stderr) => {
                     if (error) {
-                        console.error(`[KEYBOARD] Error sending "${key}" (mapped: "${mappedKey}"):`, (stderr || error.message).split('\n')[0]);
+                        console.error(`[KEYBOARD] Error sending "${key}":`, (stderr || error.message).split('\n')[0]);
                     }
                 }
             );
@@ -442,57 +563,19 @@ function setupGeneralIpcHandlers() {
         }
     });
 
-    // Synchronous handler for keyboard:send-key (used by sendSync)
+    // Synchronous handler for keyboard:send-key (used by send-key-sync)
     ipcMain.handle('keyboard:send-key-sync', async (event, key) => {
         try {
             console.log(`[KEYBOARD] Sending key (sync): ${key}`);
+            const escapedKey = String(key).replace(/'/g, "''").replace(/\\/g, '\\\\');
+            const psCommand = `Add-Type -TypeDefinition @'\n${winInputCSharp}\n'@; [WinInput]::SendKey('${escapedKey}')`;
             
-            // Map special key names and characters for SendKeys method
-            const sendKeysMap = {
-                'Enter': '{ENTER}',
-                'Tab': '{TAB}',
-                'Backspace': '{BACKSPACE}',
-                'Delete': '{DELETE}',
-                'Escape': '{ESCAPE}',
-                'Home': '{HOME}',
-                'End': '{END}',
-                'PageUp': '{PAGEUP}',
-                'PageDown': '{PAGEDOWN}',
-                'ArrowUp': '{UP}',
-                'ArrowDown': '{DOWN}',
-                'ArrowLeft': '{LEFT}',
-                'ArrowRight': '{RIGHT}',
-                '+': '{+}',
-                '^': '{^}',
-                '%': '{%}',
-                '~': '{~}',
-                '(': '{(}',
-                ')': '{)}',
-                '{': '{{}',
-                '}': '{}}',
-                '[': '{[}',
-                ']': '{]}',
-                '\n': '{ENTER}',
-                '\t': '{TAB}'
-            };
-            
-            // Convert key using map, or use as-is
-            let mappedKey = key;
-            if (sendKeysMap[key]) {
-                mappedKey = sendKeysMap[key];
-            }
-            
-            // Create PowerShell command with proper escaping
-            const escapedKey = mappedKey.replace(/'/g, "''").replace(/\$/g, '`$');
-            const psCommand = `[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; [System.Windows.Forms.SendKeys]::SendWait('${escapedKey}')`;
-            
-            // Execute PowerShell command and wait for completion
             return new Promise((resolve, reject) => {
                 execFile('powershell.exe', ['-NoProfile', '-Command', psCommand], 
                     { timeout: 2000 }, 
                     (error, stdout, stderr) => {
                         if (error) {
-                            console.error(`[KEYBOARD] Error sending "${key}" (mapped: "${mappedKey}"):`, (stderr || error.message).split('\n')[0]);
+                            console.error(`[KEYBOARD] Error sending "${key}":`, (stderr || error.message).split('\n')[0]);
                             reject(error);
                         } else {
                             resolve(true);
@@ -506,228 +589,122 @@ function setupGeneralIpcHandlers() {
         }
     });
 
-    // Handler for typing entire text at once via SendKeys script (works on ALL sites)
-    ipcMain.handle('keyboard:type-text', async (event, text) => {
-        const timestamp = Date.now();
-        const textFile = path.join(os.tmpdir(), `ultron_text_${timestamp}.txt`);
-        const scriptFile = path.join(os.tmpdir(), `ultron_sk_${timestamp}.ps1`);
-        const pauseFile = path.join(os.tmpdir(), 'ultron_pause.flag');
-        const stopFile = path.join(os.tmpdir(), 'ultron_stop.flag');
-        
-        try { fs.unlinkSync(pauseFile); } catch(e) {}
-        try { fs.unlinkSync(stopFile); } catch(e) {}
-        
-        try {
-            console.log(`[KEYBOARD] Typing text via SendKeys script (${text.length} chars)`);
-            
-            // Write text to temp file (UTF-8)
-            fs.writeFileSync(textFile, text, 'utf8');
-            
-            // Get preferences for Hold-to-Type
-            const { getPreferences } = require('./storage');
-            const prefs = getPreferences();
-            const holdToTypeEnabled = prefs.holdToTypeEnabled || false;
-            const holdToTypeKey = prefs.holdToTypeKey || '0x11,0x10,VK:]';
+    let typingCancelled = false;
+    let lastTypedText = '';
+    let lastTypedLineIndex = 0;
 
-            // PowerShell script: read text file, type line by line
-            // After each Enter, select any auto-indent and replace with our content
-            const textFilePath = textFile.replace(/\\/g, '/');
-            const pauseFilePath = pauseFile.replace(/\\/g, '/');
-            const stopFilePath = stopFile.replace(/\\/g, '/');
-            const debugFile = path.join(os.tmpdir(), 'ultron_debug.log');
-            const script = [
-                '$ErrorActionPreference = "Stop"',
-                'try {',
-                'Add-Type -AssemblyName System.Windows.Forms',
-                'Add-Type -TypeDefinition @"',
-                'using System;',
-                'using System.Runtime.InteropServices;',
-                'public class Keyboard {',
-                '    [DllImport("user32.dll")]',
-                '    public static extern short GetAsyncKeyState(int vKey);',
-                '}',
-                'public class KeyMap {',
-                '    [DllImport("user32.dll")]',
-                '    public static extern short VkKeyScan(char ch);',
-                '}',
-                '"@',
-                `$text = [System.IO.File]::ReadAllText('${textFilePath}', [System.Text.Encoding]::UTF8)`,
-                `$pauseFile = '${pauseFilePath}'`,
-                `$stopFile = '${stopFilePath}'`,
-                `$debugFile = '${debugFile}'`,
-                `$holdToTypeEnabled = $${holdToTypeEnabled ? 'true' : 'false'}`,
-                `$holdToTypeKey = '${holdToTypeKey}'`,
-                '$holdKeys = @()',
-                'foreach ($k in ($holdToTypeKey -split ",")) {',
-                '  if ($k.StartsWith("VK:")) {',
-                '    $char = $k.Substring(3)',
-                '    $vk = [KeyMap]::VkKeyScan([char]$char) -band 0xFF',
-                '    $holdKeys += $vk',
-                '  } else {',
-                '    $holdKeys += [int]$k',
-                '  }',
-                '}',
-                'function Check-HoldKeys {',
-                '  foreach ($k in $holdKeys) {',
-                '    if (-not ([Keyboard]::GetAsyncKeyState([int]$k) -band 0x8000)) { return $false }',
-                '  }',
-                '  return $true',
-                '}',
-                'function Log-Debug($msg) {',
-                '  Add-Content -Path $debugFile -Value "$(Get-Date -Format \'HH.mm.ss.fff\') - $msg"',
-                '}',
-                'Log-Debug "Script started. holdToTypeEnabled=$holdToTypeEnabled, holdToTypeKey=$holdToTypeKey"',
-                'Log-Debug "Text length: $($text.Length)"',
-                'Log-Debug "holdKeys count: $($holdKeys.Count), values: $($holdKeys -join \',\')"',
-                '$special = @{',
-                "  '+' = '{+}'; '^' = '{^}'; '%' = '{%}'; '~' = '{~}'",
-                "  '(' = '{(}'; ')' = '{)}'; '{' = '{{}'; '}' = '{}}'",
-                "  '[' = '{[}'; ']' = '{]}'",
-                '}',
-                '',
-                'function Check-Modifiers {',
-                '  $ctrl = [Keyboard]::GetAsyncKeyState(0x11) -band 0x8000',
-                '  $alt = [Keyboard]::GetAsyncKeyState(0x12) -band 0x8000',
-                '  $win = ([Keyboard]::GetAsyncKeyState(0x5B) -band 0x8000) -or ([Keyboard]::GetAsyncKeyState(0x5C) -band 0x8000)',
-                '  return ($ctrl -or $alt -or $win)',
-                '}',
-                '',
-                'function Check-State {',
-                '  if ([System.IO.File]::Exists($stopFile)) { Log-Debug "Stop file found"; exit }',
-                '  while ([System.IO.File]::Exists($pauseFile)) {',
-                '    if ([System.IO.File]::Exists($stopFile)) { Log-Debug "Stop file found during pause"; exit }',
-                '    Start-Sleep -Milliseconds 100',
-                '  }',
-                '  if ($holdToTypeEnabled) {',
-                '    $loggedWaiting = $false',
-                '    while ($true) {',
-                '      if ([System.IO.File]::Exists($stopFile)) { exit }',
-                '      if ([System.IO.File]::Exists($pauseFile)) { Start-Sleep -Milliseconds 100; continue }',
-                '      if (Check-HoldKeys) { break }',
-                '      if (-not $loggedWaiting) { Log-Debug "Waiting for hold keys..."; $loggedWaiting = $true }',
-                '      Start-Sleep -Milliseconds 30',
-                '    }',
-                '  }',
-                '  $loggedMods = $false',
-                '  while ($true) {',
-                '    if ([System.IO.File]::Exists($stopFile)) { exit }',
-                '    if ([System.IO.File]::Exists($pauseFile)) { Start-Sleep -Milliseconds 100; continue }',
-                '    if (-not (Check-Modifiers)) { break }',
-                '    if (-not $loggedMods) { Log-Debug "Waiting for modifiers to be released..."; $loggedMods = $true }',
-                '    Start-Sleep -Milliseconds 30',
-                '  }',
-                '}',
-                '',
-                'function Send-LineText($line) {',
-                '  Log-Debug "Typing line of length $($line.Length)..."',
-                '  foreach ($char in $line.ToCharArray()) {',
-                '    Check-State',
-                '    $key = $char.ToString()',
-                '    if ($special.ContainsKey($key)) {',
-                '      [System.Windows.Forms.SendKeys]::SendWait($special[$key])',
-                '    } else {',
-                '      [System.Windows.Forms.SendKeys]::SendWait($key)',
-                '    }',
-                '    Start-Sleep -Milliseconds 10',
-                '  }',
-                '}',
-                '',
-                '$lines = $text -split "`n"',
-                '$isFirst = $true',
-                'Log-Debug "Total lines: $($lines.Count)"',
-                'foreach ($line in $lines) {',
-                '  Check-State',
-                '  $line = $line.TrimEnd("`r")',
-                '',
-                '  if ($isFirst) {',
-                '    $isFirst = $false',
-                '    if ($line.Length -gt 0) { Send-LineText $line }',
-                '    continue',
-                '  }',
-                '',
-                '  # Send Enter then clear any auto-indent',
-                '  Check-State',
-                '  [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")',
-                '  Start-Sleep -Milliseconds 30',
-                '  Check-State',
-                '  [System.Windows.Forms.SendKeys]::SendWait("{HOME}{HOME}")',
-                '  Check-State',
-                '  [System.Windows.Forms.SendKeys]::SendWait("+{END}")',
-                '',
-                '  if ($line.Length -gt 0) {',
-                '    Send-LineText $line',
-                '  } else {',
-                '    Check-State',
-                '    [System.Windows.Forms.SendKeys]::SendWait("{DELETE}")',
-                '  }',
-                '}',
-                'Log-Debug "Script finished normally."',
-                '} catch {',
-                '  $errMsg = $_.Exception.Message',
-                '  $errLine = $_.InvocationInfo.ScriptLineNumber',
-                '  Add-Content -Path $debugFile -Value "$(Get-Date -Format \'HH.mm.ss.fff\') - FATAL ERROR at line $errLine : $errMsg"',
-                '  Add-Content -Path $debugFile -Value "$(Get-Date -Format \'HH.mm.ss.fff\') - Full error: $_"',
-                '  throw',
-                '}'
-            ].join('\r\n');
+    // Handler for typing entire text via SendInput C# executable
+    ipcMain.handle('keyboard:type-text', async (event, data) => {
+        let text = typeof data === 'string' ? data : (data?.text || '');
+        const mode = (typeof data === 'object' && data?.mode) ? data.mode : 'instant';
+        
+        if (!text || text.length === 0) return true;
+
+        // Ignore UI loading texts if user accidentally triggers early
+        if (text.includes('Analyzing image and extracting code (Stage') || 
+            text.includes('Generating initial solution (Stage') ||
+            text.includes('*Verifying solution...')) {
+            console.log('[KEYBOARD] Ignoring UI loading text');
+            return true;
+        }
+
+        // Extract code from markdown backticks if present
+        if (text.includes('```')) {
+            const codeBlockRegex = /```[\w]*\n([\s\S]*?)```/g;
+            let extracted = '';
+            let match;
+            while ((match = codeBlockRegex.exec(text)) !== null) {
+                extracted += match[1] + '\n';
+            }
+            if (extracted.trim()) {
+                text = extracted.trim();
+            }
+        }
+
+        // Implement stateful line-by-line mode
+        if (mode === 'lineByLine') {
+            if (text !== lastTypedText) {
+                lastTypedText = text;
+                lastTypedLineIndex = 0;
+            }
             
-            // Dump generated script for debugging
-            const dumpFile = path.join(os.tmpdir(), 'ultron_last_script.ps1');
-            try { fs.writeFileSync(dumpFile, script, 'utf8'); } catch(e) {}
+            const lines = text.split('\n');
+            if (lastTypedLineIndex >= lines.length) {
+                console.log('[KEYBOARD] Reached end of text for lineByLine mode. Resetting.');
+                lastTypedLineIndex = 0;
+                return true; // Already typed everything
+            }
             
-            // Write script to file and execute with -File (stdin piping breaks here-strings)
-            fs.writeFileSync(scriptFile, script, 'utf8');
-            console.log(`[KEYBOARD] Script saved to ${scriptFile}`);
+            text = lines[lastTypedLineIndex] + '\n';
+            console.log(`[KEYBOARD] Typing line ${lastTypedLineIndex + 1}/${lines.length}`);
+            lastTypedLineIndex++;
+        } else {
+            lastTypedText = '';
+            lastTypedLineIndex = 0;
+        }
+
+        try {
+            // Allow 250ms for the user to release the hotkeys (Ctrl+Alt+Space) 
+            // before SendInput starts firing, otherwise modifier keys interfere with typing.
+            await new Promise(resolve => setTimeout(resolve, 250));
             
-            console.log('[KEYBOARD] Starting PowerShell Auto-Typer via -File...');
-            return new Promise((resolve, reject) => {
-                const { spawn } = require('child_process');
-                const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptFile]);
-                
-                let stderrData = '';
-                
-                child.stdout.on('data', (data) => {
-                    console.log('[KEYBOARD] PowerShell stdout:', data.toString().trim());
-                });
-                
-                child.stderr.on('data', (data) => {
-                    stderrData += data.toString();
-                    console.error('[KEYBOARD] PowerShell stderr chunk:', data.toString().trim());
-                });
-                
-                child.on('close', (code) => {
+            if (typingCancelled) {
+                return false;
+            }
+
+            const timestamp = Date.now();
+            const textFile = path.join(os.tmpdir(), `ultron_text_${timestamp}.txt`);
+            const pauseFile = path.join(os.tmpdir(), 'ultron_pause.flag');
+            const stopFile = path.join(os.tmpdir(), 'ultron_stop.flag');
+            
+            try { fs.unlinkSync(pauseFile); } catch(e) {}
+            try { fs.unlinkSync(stopFile); } catch(e) {}
+
+            console.log(`[KEYBOARD] Typing text via AutoTyper.exe (${text.length} chars, mode: ${mode})`);
+            fs.writeFileSync(textFile, text, 'utf8');
+
+            const { execFile } = require('child_process');
+            const autoTyperPath = app.isPackaged
+                ? path.join(process.resourcesPath, 'AutoTyper.exe')
+                : path.join(__dirname, 'utils', 'AutoTyper.exe');
+
+            console.log(`[KEYBOARD] Executing native AutoTyper: ${autoTyperPath}`);
+
+            // Register Escape to kill during typing
+            globalShortcut.register('Escape', () => {
+                if (activeTypingProcess) {
+                    console.log('[KEYBOARD] Killing active typing process via Escape shortcut');
+                    activeTypingProcess.kill();
                     activeTypingProcess = null;
-                    // Clean up temp files
+                }
+            });
+
+            return new Promise((resolve, reject) => {
+                const child = execFile(autoTyperPath, [textFile, mode], (error, stdout, stderr) => {
+                    activeTypingProcess = null;
+                    globalShortcut.unregister('Escape');
                     try { fs.unlinkSync(textFile); } catch(e) {}
-                    try { fs.unlinkSync(scriptFile); } catch(e) {}
-                    
-                    if (stderrData.trim()) {
-                        console.error('[KEYBOARD] PowerShell stderr:', stderrData);
-                    }
-                    
-                    if (code !== 0) {
-                        console.error('[KEYBOARD] Error typing text via script:', stderrData.split('\n')[0]);
-                        reject(new Error(stderrData || 'PowerShell script failed'));
+
+                    if (error) {
+                        if (error.signal === 'SIGTERM') {
+                            console.log('[KEYBOARD] AutoTyper was killed.');
+                            resolve(false);
+                        } else {
+                            console.error('[KEYBOARD] AutoTyper execution failed:', error.message);
+                            reject(error);
+                        }
                     } else {
-                        console.log('[KEYBOARD] SendKeys script completed successfully');
+                        console.log('[KEYBOARD] AutoTyper completed successfully');
                         resolve(true);
                     }
                 });
-                
-                child.on('error', (error) => {
-                    activeTypingProcess = null;
-                    try { fs.unlinkSync(textFile); } catch(e) {}
-                    try { fs.unlinkSync(scriptFile); } catch(e) {}
-                    console.error('[KEYBOARD] Failed to spawn PowerShell:', error.message);
-                    reject(error);
-                });
-                
+
                 activeTypingProcess = child;
             });
         } catch (error) {
             activeTypingProcess = null;
-            try { fs.unlinkSync(textFile); } catch(e) {}
-            console.error('[KEYBOARD] Failed to type text:', error.message);
+            globalShortcut.unregister('Escape');
+            console.error('[KEYBOARD] Failed to setup AutoTyper:', error.message);
             throw error;
         }
     });

@@ -82,16 +82,16 @@ export function getKeyboardControl() {
 
         console.log(`[AutoType] Sent key: ${normalizedKey}`);
       },
-      typeText: async (text) => {
+      typeText: async (text, mode = 'instant', options = {}) => {
         if (ipcRenderer?.invoke) {
           try {
-            await ipcRenderer.invoke('keyboard:type-text', text);
+            await ipcRenderer.invoke('keyboard:type-text', { text, mode, ...options });
             return;
           } catch (err) {
             console.warn(`[AutoType] Could not type text via invoke:`, err?.message || err);
           }
         }
-        console.log(`[AutoType] Typed text instantly: ${text.length} chars`);
+        console.log(`[AutoType] Typed text (${mode}): ${text.length} chars`);
       }
     };
   } catch (err) {
@@ -100,8 +100,8 @@ export function getKeyboardControl() {
       sendKey: async (key) => {
         console.log(`[AutoType] (Fallback) Sent key: ${key}`);
       },
-      typeText: async (text) => {
-        console.log(`[AutoType] (Fallback) Typed text instantly: ${text.length} chars`);
+      typeText: async (text, mode = 'instant') => {
+        console.log(`[AutoType] (Fallback) Typed text (${mode}): ${text.length} chars`);
       }
     };
   }
@@ -131,23 +131,27 @@ export function createAutotyper(keyboard) {
 
       console.log(`[AutoType] Starting char-by-char typing (${text.length} chars, ${minDelay}-${maxDelay}ms delays)`);
       
-      for (const char of text) {
-        if (typingState.shouldStop) {
-          console.log('[AutoType] Typing stopped by user');
-          break;
+      if (keyboard.typeText) {
+        await keyboard.typeText(text, 'charByChar', { minDelay, maxDelay });
+      } else {
+        for (const char of text) {
+          if (typingState.shouldStop) {
+            console.log('[AutoType] Typing stopped by user');
+            break;
+          }
+
+          while (typingState.isPaused && !typingState.shouldStop) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
+
+          if (typingState.shouldStop) break;
+
+          await keyboard.sendKey(char);
+          
+          // Randomize delay to mimic natural typing
+          const delay = Math.random() * (maxDelay - minDelay) + minDelay;
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
-
-        while (typingState.isPaused && !typingState.shouldStop) {
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-
-        if (typingState.shouldStop) break;
-
-        await keyboard.sendKey(char);
-        
-        // Randomize delay to mimic natural typing
-        const delay = Math.random() * (maxDelay - minDelay) + minDelay;
-        await new Promise(resolve => setTimeout(resolve, delay));
       }
       
       typingState.isTyping = false;
@@ -168,16 +172,16 @@ export function createAutotyper(keyboard) {
       console.log(`[AutoType] Starting instant typing (${text.length} chars)`);
       
       if (keyboard.typeText) {
-          await keyboard.typeText(text);
+        await keyboard.typeText(text, 'instant', options);
       } else {
-          for (const char of text) {
-              if (typingState.shouldStop) break;
-              while (typingState.isPaused && !typingState.shouldStop) {
-                  await new Promise(resolve => setTimeout(resolve, 50));
-              }
-              if (typingState.shouldStop) break;
-              await keyboard.sendKey(char);
+        for (const char of text) {
+          if (typingState.shouldStop) break;
+          while (typingState.isPaused && !typingState.shouldStop) {
+            await new Promise(resolve => setTimeout(resolve, 50));
           }
+          if (typingState.shouldStop) break;
+          await keyboard.sendKey(char);
+        }
       }
       
       typingState.isTyping = false;
@@ -204,41 +208,45 @@ export function createAutotyper(keyboard) {
       
       console.log(`[AutoType] Starting word-by-word typing (${words.length} words, ${charDelay}ms char delay, ${wordDelay}ms word delay)`);
       
-      for (const word of words) {
-        if (typingState.shouldStop) {
-          console.log('[AutoType] Typing stopped by user');
-          break;
-        }
-
-        while (typingState.isPaused && !typingState.shouldStop) {
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-
-        if (typingState.shouldStop) break;
-
-        if (word === '\n') {
-          await keyboard.sendKey('Enter');
-          await new Promise(resolve => setTimeout(resolve, wordDelay));
-        } else if (word === '\t') {
-          await keyboard.sendKey('Tab');
-          await new Promise(resolve => setTimeout(resolve, wordDelay));
-        } else if (word === ' ') {
-          await keyboard.sendKey(' ');
-          await new Promise(resolve => setTimeout(resolve, wordDelay));
-        } else if (word.length > 0) {
-          // Type each character in the word with charDelay
-          for (const char of word) {
-            if (typingState.shouldStop) break;
-            while (typingState.isPaused && !typingState.shouldStop) {
-              await new Promise(resolve => setTimeout(resolve, 50));
-            }
-            if (typingState.shouldStop) break;
-
-            await keyboard.sendKey(char);
-            await new Promise(resolve => setTimeout(resolve, charDelay));
+      if (keyboard.typeText) {
+        await keyboard.typeText(text, 'wordByWord', { charDelay, wordDelay });
+      } else {
+        for (const word of words) {
+          if (typingState.shouldStop) {
+            console.log('[AutoType] Typing stopped by user');
+            break;
           }
-          // Pause after word before next word
-          await new Promise(resolve => setTimeout(resolve, wordDelay));
+
+          while (typingState.isPaused && !typingState.shouldStop) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
+
+          if (typingState.shouldStop) break;
+
+          if (word === '\n') {
+            await keyboard.sendKey('Enter');
+            await new Promise(resolve => setTimeout(resolve, wordDelay));
+          } else if (word === '\t') {
+            await keyboard.sendKey('Tab');
+            await new Promise(resolve => setTimeout(resolve, wordDelay));
+          } else if (word === ' ') {
+            await keyboard.sendKey(' ');
+            await new Promise(resolve => setTimeout(resolve, wordDelay));
+          } else if (word.length > 0) {
+            // Type each character in the word with charDelay
+            for (const char of word) {
+              if (typingState.shouldStop) break;
+              while (typingState.isPaused && !typingState.shouldStop) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+              }
+              if (typingState.shouldStop) break;
+
+              await keyboard.sendKey(char);
+              await new Promise(resolve => setTimeout(resolve, charDelay));
+            }
+            // Pause after word before next word
+            await new Promise(resolve => setTimeout(resolve, wordDelay));
+          }
         }
       }
       
@@ -265,41 +273,45 @@ export function createAutotyper(keyboard) {
       
       console.log(`[AutoType] Starting line-by-line typing (${lines.length} lines, ${charDelay}ms char delay, ${lineDelay}ms line delay)`);
       
-      for (let i = 0; i < lines.length; i++) {
-        if (typingState.shouldStop) {
-          console.log('[AutoType] Typing stopped by user');
-          break;
-        }
+      if (keyboard.typeText) {
+        await keyboard.typeText(text, 'lineByLine', { charDelay, lineDelay });
+      } else {
+        for (let i = 0; i < lines.length; i++) {
+          if (typingState.shouldStop) {
+            console.log('[AutoType] Typing stopped by user');
+            break;
+          }
 
-        while (typingState.isPaused && !typingState.shouldStop) {
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-
-        if (typingState.shouldStop) break;
-
-        const line = lines[i];
-        
-        // Type each character in the line
-        for (const char of line) {
-          if (typingState.shouldStop) break;
           while (typingState.isPaused && !typingState.shouldStop) {
             await new Promise(resolve => setTimeout(resolve, 50));
           }
+
           if (typingState.shouldStop) break;
 
-          await keyboard.sendKey(char);
-          await new Promise(resolve => setTimeout(resolve, charDelay));
-        }
-        
-        if (typingState.shouldStop) break;
+          const line = lines[i];
+          
+          // Type each character in the line
+          for (const char of line) {
+            if (typingState.shouldStop) break;
+            while (typingState.isPaused && !typingState.shouldStop) {
+              await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            if (typingState.shouldStop) break;
 
-        // Send newline if not the last line
-        if (i < lines.length - 1) {
-          await keyboard.sendKey('Enter');
+            await keyboard.sendKey(char);
+            await new Promise(resolve => setTimeout(resolve, charDelay));
+          }
+          
+          if (typingState.shouldStop) break;
+
+          // Send newline if not the last line
+          if (i < lines.length - 1) {
+            await keyboard.sendKey('Enter');
+          }
+          
+          // Pause after line
+          await new Promise(resolve => setTimeout(resolve, lineDelay));
         }
-        
-        // Pause after line
-        await new Promise(resolve => setTimeout(resolve, lineDelay));
       }
       
       typingState.isTyping = false;
