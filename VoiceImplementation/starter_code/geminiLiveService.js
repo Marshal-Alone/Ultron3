@@ -1,62 +1,71 @@
 /**
  * geminiLiveService.js
  * Node.js backend service for Google Gemini Multimodal Live API.
- * Manages WebSocket connection, 24kHz audio ingestion, speaker diarization, and auto-reconnect.
+ * Manages WebSocket connection, 24kHz audio ingestion, speaker diarization,
+ * adaptive speech debouncing, and auto-reconnect.
  */
 
 const { GoogleGenAI, Modality } = require('@google/genai');
+const PromptLogger = require('./promptLogger');
 
 class GeminiLiveService {
     constructor() {
         this.session = null;
+        this.client = null;
         this.apiKey = null;
         this.systemPrompt = '';
         this.language = 'en-US';
-        this.model = 'gemini-3.1-flash-live-preview';
+        this.model = 'gemini-2.0-flash-exp';
         this.conversationHistory = [];
+        this.pendingSpeechTranscript = '';
+        this.speechDebounceTimer = null;
         this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 3;
+        this.maxReconnectAttempts = 5;
         this.isUserClosing = false;
+        this.isGeminiGenerating = false;
 
         // Event callbacks
-        this.onTranscript = null; // (text, speakerId) => void
-        this.onModelOutput = null; // (chunk) => void
-        this.onTurnComplete = null; // () => void
+        this.onTranscript = null; // (text, speakerLabel) => void
+        this.onModelOutput = null; // (token, isFirst) => void
+        this.onTurnComplete = null; // (fullAnswer) => void
         this.onStatus = null; // (statusString) => void
+        this.externalAnswerHandler = null; // Optional external handler (e.g. Groq)
     }
 
     /**
      * Initializes and connects to the Gemini Live session.
      */
-    async connect({ apiKey, systemPrompt, language = 'en-US', model = 'gemini-3.1-flash-live-preview' }) {
+    async connect({ apiKey, systemPrompt, language = 'en-US', model = 'gemini-2.0-flash-exp', externalAnswerHandler = null }) {
         this.apiKey = apiKey;
         this.systemPrompt = systemPrompt;
         this.language = language;
         this.model = model;
+        this.externalAnswerHandler = externalAnswerHandler;
         this.isUserClosing = false;
 
-        const client = new GoogleGenAI({
-            vertexai: false,
+        this.client = new GoogleGenAI({
             apiKey: this.apiKey,
             httpOptions: { apiVersion: 'v1alpha' },
         });
 
+        console.log(`[VOICE LOG] Initializing Live Session | Model: ${this.model}`);
+
         try {
-            this.session = await client.live.connect({
+            this.session = await this.client.live.connect({
                 model: this.model,
                 callbacks: {
                     onopen: () => {
-                        console.log('[GeminiLive] WebSocket connected');
+                        console.log('[VOICE LOG] WebSocket connected & ready for audio streaming');
                         this.reconnectAttempts = 0;
-                        this.onStatus?.('Live session connected');
+                        this.onStatus?.('Listening...');
                     },
                     onmessage: message => this._handleMessage(message),
                     onerror: error => {
-                        console.error('[GeminiLive] Error:', error.message);
+                        console.error('[VOICE LOG] Session error:', error.message);
                         this.onStatus?.(`Error: ${error.message}`);
                     },
                     onclose: event => {
-                        console.log('[GeminiLive] Closed:', event.reason);
+                        console.log('[VOICE LOG] Session closed:', event.reason || '');
                         if (!this.isUserClosing) {
                             this._attemptReconnect();
                         } else {
@@ -65,8 +74,8 @@ class GeminiLiveService {
                     },
                 },
                 config: {
+                    // CRITICAL: Live WebSocket MUST use Modality.AUDIO
                     responseModalities: [Modality.AUDIO],
-                    proactivity: { proactiveAudio: true },
                     outputAudioTranscription: {},
                     inputAudioTranscription: {
                         enableSpeakerDiarization: true,
@@ -83,32 +92,128 @@ class GeminiLiveService {
 
             return true;
         } catch (error) {
-            console.error('[GeminiLive] Initialization failed:', error);
+            console.error('[VOICE LOG] Initialization failed:', error);
             this.onStatus?.('Failed to connect to Gemini Live');
             return false;
         }
     }
 
     _handleMessage(message) {
+        let newTranscript = '';
+
         // 1. Process Diarized Input Transcription
         if (message.serverContent?.inputTranscription?.results) {
             for (const result of message.serverContent.inputTranscription.results) {
                 if (result.transcript) {
-                    this.onTranscript?.(result.transcript, result.speakerId || 1);
+                    const speaker = result.speakerId === 1 ? 'Interviewer' : 'Candidate';
+                    const text = `[${speaker}]: ${result.transcript} `;
+                    newTranscript += text;
+                    this.onTranscript?.(result.transcript, speaker);
                 }
             }
+            this.pendingSpeechTranscript += newTranscript;
         } else if (message.serverContent?.inputTranscription?.text) {
-            this.onTranscript?.(message.serverContent.inputTranscription.text, 1);
+            newTranscript = message.serverContent.inputTranscription.text;
+            this.pendingSpeechTranscript += newTranscript;
+            this.onTranscript?.(newTranscript, 'User');
         }
 
-        // 2. Process Gemini Model Spoken Output Transcript
-        if (message.serverContent?.outputTranscription?.text) {
-            this.onModelOutput?.(message.serverContent.outputTranscription.text);
+        // 2. Adaptive Speech Debounce (350ms on punctuation, 900ms otherwise)
+        if (newTranscript && newTranscript.trim() !== '') {
+            if (this.speechDebounceTimer) {
+                clearTimeout(this.speechDebounceTimer);
+                this.speechDebounceTimer = null;
+            }
+
+            const trimmed = this.pendingSpeechTranscript.trim();
+            const hasPunctuationEnd = /[.?!]\s*$/.test(trimmed);
+            const debounceDelay = hasPunctuationEnd ? 350 : 900;
+
+            this.speechDebounceTimer = setTimeout(() => {
+                if (this.pendingSpeechTranscript.trim().length > 3) {
+                    const question = this.pendingSpeechTranscript.trim();
+                    this.pendingSpeechTranscript = '';
+                    this._dispatchAnswer(question);
+                }
+            }, debounceDelay);
         }
 
         // 3. Process Turn Complete
         if (message.serverContent?.turnComplete) {
-            this.onTurnComplete?.();
+            if (this.pendingSpeechTranscript.trim().length > 3) {
+                if (this.speechDebounceTimer) {
+                    clearTimeout(this.speechDebounceTimer);
+                    this.speechDebounceTimer = null;
+                }
+                const question = this.pendingSpeechTranscript.trim();
+                this.pendingSpeechTranscript = '';
+                this._dispatchAnswer(question);
+            }
+            this.onStatus?.('Listening...');
+        }
+    }
+
+    async _dispatchAnswer(question) {
+        this.onStatus?.('Thinking...');
+
+        if (this.externalAnswerHandler) {
+            return this.externalAnswerHandler(question, this.systemPrompt);
+        }
+
+        return this.streamGeminiTextAnswer(question);
+    }
+
+    /**
+     * Fallback text answering via Gemini 2.5 Flash HTTP stream
+     */
+    async streamGeminiTextAnswer(question) {
+        if (this.isGeminiGenerating) return;
+        this.isGeminiGenerating = true;
+
+        PromptLogger.logPayloadSentToAI({
+            systemPrompt: this.systemPrompt,
+            conversationHistory: this.conversationHistory,
+            question: question.trim(),
+        });
+
+        try {
+            const responseStream = await this.client.models.generateContentStream({
+                model: 'gemini-2.5-flash',
+                contents: [
+                    ...this.conversationHistory.slice(-6).map(t => ({
+                        role: t.role,
+                        parts: [{ text: t.content }],
+                    })),
+                    { role: 'user', parts: [{ text: question }] },
+                ],
+                config: {
+                    systemInstruction: this.systemPrompt,
+                    temperature: 0.3,
+                },
+            });
+
+            let fullText = '';
+            let isFirst = true;
+
+            for await (const chunk of responseStream) {
+                const token = chunk.text || '';
+                if (token) {
+                    fullText += token;
+                    this.onModelOutput?.(fullText, isFirst);
+                    isFirst = false;
+                }
+            }
+
+            if (fullText.trim()) {
+                this.conversationHistory.push({ role: 'user', content: question });
+                this.conversationHistory.push({ role: 'model', content: fullText });
+                console.log(`[VOICE LOG] [AI RESPONSE]:\n${fullText}`);
+                this.onTurnComplete?.(fullText);
+            }
+        } catch (err) {
+            console.error('[GeminiLive] Stream text answer error:', err.message);
+        } finally {
+            this.isGeminiGenerating = false;
             this.onStatus?.('Listening...');
         }
     }
@@ -162,24 +267,12 @@ class GeminiLiveService {
             systemPrompt: this.systemPrompt,
             language: this.language,
             model: this.model,
+            externalAnswerHandler: this.externalAnswerHandler,
         });
 
         if (success && this.conversationHistory.length > 0) {
-            // Context restoration message
-            const contextLines = this.conversationHistory
-                .slice(-20)
-                .map(turn => `[Interviewer]: ${turn.transcription}\n[Answer]: ${turn.aiResponse}`);
-            const restoreMsg = `Session reconnected. Here is the conversation context so far:\n\n${contextLines.join('\n\n')}\n\nContinue assisting.`;
-            await this.sendText(restoreMsg);
+            console.log('[VOICE LOG] Session reconnected successfully, restoring context...');
         }
-    }
-
-    saveTurn(transcription, aiResponse) {
-        this.conversationHistory.push({
-            transcription,
-            aiResponse,
-            timestamp: Date.now(),
-        });
     }
 
     async close() {

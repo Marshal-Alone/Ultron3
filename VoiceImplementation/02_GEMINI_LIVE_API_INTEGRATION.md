@@ -48,7 +48,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     const systemPrompt = getSystemPrompt(profile, customPrompt);
 
     const session = await client.live.connect({
-        model: 'gemini-3.1-flash-live-preview', // or gemini-2.0-flash-exp
+        model: 'gemini-2.0-flash-exp', // Recommended Live STT model
         callbacks: {
             onopen: handleSessionOpen,
             onmessage: handleSessionMessage,
@@ -56,7 +56,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             onclose: handleSessionClose,
         },
         config: {
-            // Audio response modality (enables speech transcription)
+            // CRITICAL: Must be AUDIO. Requesting [Modality.TEXT] causes WebSocket rejection.
             responseModalities: [Modality.AUDIO],
             proactivity: { proactiveAudio: true },
             outputAudioTranscription: {}, // Request text transcript of model output
@@ -68,17 +68,14 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                 maxSpeakerCount: 2,
             },
 
-            // Prevent context overflow during long sessions
+            // Prevent context overflow during long sessions (40 - 120 mins)
             contextWindowCompression: { slidingWindow: {} },
             speechConfig: { languageCode: language },
 
-            // System instructions defining the persona & response brevity
+            // System instructions defining persona & brevity
             systemInstruction: {
                 parts: [{ text: systemPrompt }],
             },
-
-            // Optional real-time tools (e.g. Google Search)
-            tools: [{ googleSearch: {} }],
         },
     });
 
@@ -88,56 +85,69 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
 ---
 
-## 4. Real-Time Event Handling (`onmessage`)
+## 4. Real-Time Event Handling & Debounced Answering (`onmessage`)
 
-The `onmessage` callback receives structured payloads from Google's Live server:
+The `onmessage` callback receives real-time STT transcripts. Because conversational turns can pause mid-sentence, use an adaptive debounce timer (350ms on punctuation marks `.?!`, 900ms on natural pauses) before generating the answer:
 
 ```javascript
-let currentTranscription = '';
-let messageBuffer = '';
-let groqRequestStartedForTurn = false;
+let pendingSpeechTranscript = '';
+let speechDebounceTimer = null;
 
 function handleSessionMessage(message) {
-    // 1. INPUT TRANSCRIPTION: What was spoken into the system / mic
+    let newTranscript = '';
+
+    // 1. INPUT TRANSCRIPTION: User / Interviewer speaking
     if (message.serverContent?.inputTranscription?.results) {
-        // Formatted with speaker tags (e.g., [Interviewer]: "Tell me about yourself")
-        currentTranscription += formatSpeakerResults(message.serverContent.inputTranscription.results);
+        newTranscript = formatSpeakerResults(message.serverContent.inputTranscription.results);
+        pendingSpeechTranscript += newTranscript;
     } else if (message.serverContent?.inputTranscription?.text) {
-        const text = message.serverContent.inputTranscription.text;
-        if (text.trim() !== '') {
-            currentTranscription += text;
+        newTranscript = message.serverContent.inputTranscription.text;
+        pendingSpeechTranscript += newTranscript;
+    }
+
+    // 2. ADAPTIVE DEBOUNCED AI ANSWERING (Groq or Gemini)
+    if (newTranscript && newTranscript.trim() !== '') {
+        if (speechDebounceTimer) {
+            clearTimeout(speechDebounceTimer);
+            speechDebounceTimer = null;
         }
-    }
 
-    // 2. TRIGGER DUAL-AI FAST RESPONSE (e.g. Groq)
-    if (message.serverContent?.inputTranscription) {
-        // Send the transcription to Groq for sub-second answering
-        sendFinalTranscriptionToGroq();
-    }
+        const trimmed = pendingSpeechTranscript.trim();
+        const hasPunctuationEnd = /[.?!]\s*$/.test(trimmed);
+        const debounceDelay = hasPunctuationEnd ? 350 : 900;
 
-    // 3. OUTPUT TRANSCRIPTION: Gemini's own generated answer (Fallback if no Groq key)
-    if (!hasGroqKey() && message.serverContent?.outputTranscription?.text) {
-        const isFirstChunk = messageBuffer === '';
-        messageBuffer += message.serverContent.outputTranscription.text;
-        sendToRenderer(isFirstChunk ? 'new-response' : 'update-response', messageBuffer);
-    }
+        speechDebounceTimer = setTimeout(() => {
+            if (pendingSpeechTranscript.trim().length > 3) {
+                const questionToAnswer = pendingSpeechTranscript.trim();
+                pendingSpeechTranscript = '';
+                sendToRenderer('update-status', 'Thinking...');
 
-    // 4. GENERATION COMPLETE: Model finished outputting response
-    if (message.serverContent?.generationComplete) {
-        if (currentTranscription.trim() !== '') {
-            if (!hasGroqKey() && messageBuffer.trim() !== '') {
-                saveConversationTurn(currentTranscription, messageBuffer);
+                if (useGroq) {
+                    groqAI.generateAnswer(questionToAnswer, systemPrompt);
+                } else {
+                    geminiStreamAnswer(questionToAnswer, systemPrompt);
+                }
             }
-            currentTranscription = '';
-        }
-        messageBuffer = '';
+        }, debounceDelay);
     }
 
-    // 5. TURN COMPLETE: Speaker finished speaking, ready for next input
+    // 3. TURN COMPLETE: Guaranteed end of conversational turn
     if (message.serverContent?.turnComplete) {
-        currentTranscription = '';
-        messageBuffer = '';
-        groqRequestStartedForTurn = false;
+        if (pendingSpeechTranscript.trim().length > 3) {
+            if (speechDebounceTimer) {
+                clearTimeout(speechDebounceTimer);
+                speechDebounceTimer = null;
+            }
+            const questionToAnswer = pendingSpeechTranscript.trim();
+            pendingSpeechTranscript = '';
+            sendToRenderer('update-status', 'Thinking...');
+
+            if (useGroq) {
+                groqAI.generateAnswer(questionToAnswer, systemPrompt);
+            } else {
+                geminiStreamAnswer(questionToAnswer, systemPrompt);
+            }
+        }
         sendToRenderer('update-status', 'Listening...');
     }
 }

@@ -200,6 +200,40 @@ RESPONSE FORMAT REQUIREMENTS:
 
 ---
 
+## 5. Multi-Stage Vision Reasoning Pipeline (Screenshots & Code Problems)
+
+When analyzing code on screen (e.g. LeetCode, HackerRank, IDEs), sending a single vision prompt often leads to hallucinations or incomplete solutions. Use a 3-stage pipeline:
+
+```
+[Screenshot Image]
+        │
+        ▼ Stage 1: Vision Extraction (qwen/qwen3.6-27b)
+[Extracted Code & Question]
+        │
+        ▼ Stage 2: Initial Solve (openai/gpt-oss-120b)
+[Initial Candidate Solution]
+        │
+        ▼ Stage 3: Verification (openai/gpt-oss-120b)
+[Verified, Bug-Free Code & Output]
+```
+
+### Stage 1: Vision Extraction (`qwen/qwen3.6-27b`)
+
+- Prompt: `"Extract all the code and the exact question/problem statement from this image. Return only the raw text, no extra commentary."`
+- Temperature: `0.1`
+
+### Stage 2: Initial Solve (`openai/gpt-oss-120b`)
+
+- Injects full System Prompt, Developer Instructions, and User Custom Context.
+- Generates step-by-step reasoning followed by the pure code block.
+
+### Stage 3: Verification (`openai/gpt-oss-120b`)
+
+- Reviews the candidate code against the problem statement and user overrides.
+- Ensures zero comments, exact class/method signature matching, and bug-free syntax.
+
+---
+
 ## 5. Token Usage Tracking & Rate Limit Mitigation
 
 To prevent unexpected billing or rate limit exhaustion (RPD/RPM):
