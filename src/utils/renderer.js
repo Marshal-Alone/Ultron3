@@ -113,7 +113,14 @@ const storage = {
     async getTodayLimits() {
         const result = await ipcRenderer.invoke('storage:get-today-limits');
         return result.success ? result.data : { flash: { count: 0 }, flashLite: { count: 0 } };
-    }
+    },
+};
+
+const prompts = {
+    async getDefaultSystemPrompt(profile) {
+        const result = await ipcRenderer.invoke('prompts:get-default-system-prompt', profile);
+        return result.success ? result.data : '';
+    },
 };
 
 // Cache for preferences to avoid async calls in hot paths
@@ -296,12 +303,12 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                 },
             });
 
-            console.log('Windows capture started with loopback audio');
+            const hasSystemAudio = mediaStream.getAudioTracks().length > 0;
+            if (hasSystemAudio) {
+                setupWindowsLoopbackProcessing();
+            }
 
-            // Setup audio processing for Windows loopback audio only
-            setupWindowsLoopbackProcessing();
-
-            if (audioMode === 'mic_only' || audioMode === 'both') {
+            if (audioMode === 'mic_only' || audioMode === 'both' || !hasSystemAudio) {
                 let micStream = null;
                 try {
                     micStream = await navigator.mediaDevices.getUserMedia({
@@ -314,10 +321,9 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
                         },
                         video: false,
                     });
-                    console.log('Windows microphone capture started');
                     setupLinuxMicProcessing(micStream);
                 } catch (micError) {
-                    console.warn('Failed to get microphone access on Windows:', micError);
+                    console.warn('Microphone capture not available:', micError);
                 }
             }
         }
@@ -336,59 +342,84 @@ async function startCapture(screenshotIntervalSeconds = 5, imageQuality = 'mediu
     }
 }
 
-function setupLinuxMicProcessing(micStream) {
-    // Setup microphone audio processing for Linux
-    const micAudioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
-    const micSource = micAudioContext.createMediaStreamSource(micStream);
-    const micProcessor = micAudioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
+let micStream = null;
+let micAudioContext = null;
 
-    let audioBuffer = [];
+function setupLinuxMicProcessing(stream) {
+    setupMicProcessing(stream);
+}
+
+function setupMicProcessing(stream) {
+    micStream = stream;
+    micAudioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+    const micSource = micAudioContext.createMediaStreamSource(micStream);
+    micAudioProcessor = micAudioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
+
+    let buffer = [];
     const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
 
-    micProcessor.onaudioprocess = async e => {
+    micAudioProcessor.onaudioprocess = e => {
         const inputData = e.inputBuffer.getChannelData(0);
-        audioBuffer.push(...inputData);
+        for (let i = 0; i < inputData.length; i++) {
+            buffer.push(inputData[i]);
+        }
 
-        // Process audio in chunks
-        while (audioBuffer.length >= samplesPerChunk) {
-            const chunk = audioBuffer.splice(0, samplesPerChunk);
+        while (buffer.length >= samplesPerChunk) {
+            const chunk = buffer.splice(0, samplesPerChunk);
             const pcmData16 = convertFloat32ToInt16(chunk);
             const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-            await ipcRenderer.invoke('send-mic-audio-content', {
+            // Compute RMS for sound reactivity
+            let sumSq = 0;
+            for (let i = 0; i < chunk.length; i++) {
+                sumSq += chunk[i] * chunk[i];
+            }
+            const rms = Math.sqrt(sumSq / chunk.length);
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('audio-activity', { detail: { rms } }));
+            }
+
+            ipcRenderer.send('send-mic-audio-content', {
                 data: base64Data,
                 mimeType: 'audio/pcm;rate=24000',
             });
         }
     };
 
-    micSource.connect(micProcessor);
-    micProcessor.connect(micAudioContext.destination);
-
-    // Store processor reference for cleanup
-    micAudioProcessor = micProcessor;
+    micSource.connect(micAudioProcessor);
+    micAudioProcessor.connect(micAudioContext.destination);
 }
 
 function setupLinuxSystemAudioProcessing() {
-    // Setup system audio processing for Linux (from getDisplayMedia)
     audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
     const source = audioContext.createMediaStreamSource(mediaStream);
     audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
 
-    let audioBuffer = [];
+    let buffer = [];
     const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
 
-    audioProcessor.onaudioprocess = async e => {
+    audioProcessor.onaudioprocess = e => {
         const inputData = e.inputBuffer.getChannelData(0);
-        audioBuffer.push(...inputData);
+        for (let i = 0; i < inputData.length; i++) {
+            buffer.push(inputData[i]);
+        }
 
-        // Process audio in chunks
-        while (audioBuffer.length >= samplesPerChunk) {
-            const chunk = audioBuffer.splice(0, samplesPerChunk);
+        while (buffer.length >= samplesPerChunk) {
+            const chunk = buffer.splice(0, samplesPerChunk);
             const pcmData16 = convertFloat32ToInt16(chunk);
             const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-            await ipcRenderer.invoke('send-audio-content', {
+            // Compute RMS for sound reactivity
+            let sumSq = 0;
+            for (let i = 0; i < chunk.length; i++) {
+                sumSq += chunk[i] * chunk[i];
+            }
+            const rms = Math.sqrt(sumSq / chunk.length);
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('audio-activity', { detail: { rms } }));
+            }
+
+            ipcRenderer.send('send-audio-content', {
                 data: base64Data,
                 mimeType: 'audio/pcm;rate=24000',
             });
@@ -400,25 +431,39 @@ function setupLinuxSystemAudioProcessing() {
 }
 
 function setupWindowsLoopbackProcessing() {
-    // Setup audio processing for Windows loopback audio only
+    if (!mediaStream || mediaStream.getAudioTracks().length === 0) {
+        console.warn('[VOICE LOG] ⚠️ No system loopback audio track found on mediaStream');
+        return;
+    }
     audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
     const source = audioContext.createMediaStreamSource(mediaStream);
     audioProcessor = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
 
-    let audioBuffer = [];
+    let buffer = [];
     const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
 
-    audioProcessor.onaudioprocess = async e => {
+    audioProcessor.onaudioprocess = e => {
         const inputData = e.inputBuffer.getChannelData(0);
-        audioBuffer.push(...inputData);
+        for (let i = 0; i < inputData.length; i++) {
+            buffer.push(inputData[i]);
+        }
 
-        // Process audio in chunks
-        while (audioBuffer.length >= samplesPerChunk) {
-            const chunk = audioBuffer.splice(0, samplesPerChunk);
+        while (buffer.length >= samplesPerChunk) {
+            const chunk = buffer.splice(0, samplesPerChunk);
             const pcmData16 = convertFloat32ToInt16(chunk);
             const base64Data = arrayBufferToBase64(pcmData16.buffer);
 
-            await ipcRenderer.invoke('send-audio-content', {
+            // Compute RMS for sound reactivity
+            let sumSq = 0;
+            for (let i = 0; i < chunk.length; i++) {
+                sumSq += chunk[i] * chunk[i];
+            }
+            const rms = Math.sqrt(sumSq / chunk.length);
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('audio-activity', { detail: { rms } }));
+            }
+
+            ipcRenderer.send('send-audio-content', {
                 data: base64Data,
                 mimeType: 'audio/pcm;rate=24000',
             });
@@ -605,12 +650,21 @@ async function captureManualScreenshot(imageQuality = null) {
                 // Determine which prompt to use based on context
                 const isInvigilatorCapture = window._invigilatorAnswerCapture === true;
                 const basePrompt = isInvigilatorCapture ? INVIGILATOR_ANSWER_PROMPT : MANUAL_SCREENSHOT_PROMPT;
-                
-                // Fetch user custom prompt
+
+                // Fetch user custom prompt & instructions
                 const prefs = await storage.getPreferences();
-                const customInstructions = prefs.customPrompt ? `\n\nUSER CUSTOM INSTRUCTIONS:\n${prefs.customPrompt}` : '';
+                let customInstructions = '';
+                if (prefs.developerInstruction && prefs.developerInstruction.trim()) {
+                    customInstructions += `\n\nDEVELOPER / META INSTRUCTIONS:\n${prefs.developerInstruction.trim()}`;
+                }
+                if (prefs.customPrompt && prefs.customPrompt.trim()) {
+                    customInstructions += `\n\nUSER CUSTOM INSTRUCTIONS:\n${prefs.customPrompt.trim()}`;
+                }
+                if (prefs.fullSystemPrompt && prefs.fullSystemPrompt.trim()) {
+                    customInstructions += `\n\nSYSTEM PROMPT OVERRIDE:\n${prefs.fullSystemPrompt.trim()}`;
+                }
                 const promptToUse = basePrompt + customInstructions;
-                
+
                 if (isInvigilatorCapture) {
                     console.log('[Renderer] Sending screenshot for invigilator answer capture');
                 }
@@ -667,14 +721,24 @@ function stopCapture() {
         micAudioProcessor = null;
     }
 
+    if (micAudioContext) {
+        micAudioContext.close().catch(() => {});
+        micAudioContext = null;
+    }
+
     if (audioContext) {
-        audioContext.close();
+        audioContext.close().catch(() => {});
         audioContext = null;
     }
 
     if (mediaStream) {
         mediaStream.getTracks().forEach(track => track.stop());
         mediaStream = null;
+    }
+
+    if (micStream) {
+        micStream.getTracks().forEach(track => track.stop());
+        micStream = null;
     }
 
     // Stop macOS audio capture if running
@@ -722,32 +786,35 @@ ipcRenderer.on('save-conversation-turn', async (event, data) => {
         if (data.turn?.ai_response) {
             console.log(`✅ AI Response saved to history (${data.turn.ai_response.length} characters)`);
         }
-        
+
         // Get existing session to preserve data
         const existingSession = await storage.getSession(data.sessionId);
         const existingHistory = existingSession?.conversationHistory || [];
-        
+
         // Add new turn to history if it's not already there
         let updatedHistory = existingHistory;
         if (data.turn && data.turn.timestamp) {
             // Check if this turn already exists
             const turnExists = updatedHistory.some(t => t.timestamp === data.turn.timestamp);
             if (!turnExists) {
-                updatedHistory = [...updatedHistory, {
-                    timestamp: data.turn.timestamp,
-                    transcription: data.turn.transcription || '',
-                    ai_response: data.turn.ai_response || ''
-                }];
+                updatedHistory = [
+                    ...updatedHistory,
+                    {
+                        timestamp: data.turn.timestamp,
+                        transcription: data.turn.transcription || '',
+                        ai_response: data.turn.ai_response || '',
+                    },
+                ];
             }
         }
-        
+
         const result = await storage.saveSession(data.sessionId, {
             conversationHistory: updatedHistory,
             screenAnalysisHistory: existingSession?.screenAnalysisHistory || [],
             profile: data.profile,
-            customPrompt: data.customPrompt
+            customPrompt: data.customPrompt,
         });
-        
+
         if (!result.success) {
             console.error(`❌ Failed to save Q&A: ${result.error}`);
         }
@@ -761,9 +828,9 @@ ipcRenderer.on('save-session-context', async (event, data) => {
     try {
         const result = await storage.saveSession(data.sessionId, {
             profile: data.profile,
-            customPrompt: data.customPrompt || ''
+            customPrompt: data.customPrompt || '',
         });
-        
+
         if (result.success) {
             // Notify main process that session has started (for kill switch auto-save)
             ipcRenderer.send('session-started', data.sessionId);
@@ -782,9 +849,9 @@ ipcRenderer.on('save-screen-analysis', async (event, data) => {
             screenAnalysisHistory: data.fullHistory || [],
             conversationHistory: data.conversationHistory || [],
             profile: data.profile,
-            customPrompt: data.customPrompt
+            customPrompt: data.customPrompt,
         });
-        
+
         if (!result.success) {
             console.error(`❌ Failed to save screen analysis: ${result.error}`);
         }
@@ -808,14 +875,12 @@ ipcRenderer.on('adjust-transparency', async (event, delta) => {
         newValue = Math.max(0, Math.min(1, newValue)); // Clamp between 0 and 1
         await storage.updatePreference('backgroundTransparency', newValue);
 
-        
         // Apply immediately
         const themeName = prefs.theme || 'dark';
         const colors = theme.get(themeName);
         theme.applyBackgrounds(colors.background, newValue);
-        ipcRenderer.send('background-opacity-changed', newValue);  // ← ADD THIS LINE
+        ipcRenderer.send('background-opacity-changed', newValue); // ← ADD THIS LINE
         console.log('Transparency set to:', newValue);
-
     } catch (error) {
         console.error('Error adjusting transparency:', error);
     }
@@ -908,60 +973,102 @@ const theme = {
     themes: {
         dark: {
             background: '#1e1e1e',
-            text: '#e0e0e0', textSecondary: '#a0a0a0', textMuted: '#6b6b6b',
-            border: '#333333', accent: '#ffffff',
-            btnPrimaryBg: '#ffffff', btnPrimaryText: '#000000', btnPrimaryHover: '#e0e0e0',
-            tooltipBg: '#1a1a1a', tooltipText: '#ffffff',
-            keyBg: 'rgba(255,255,255,0.1)'
+            text: '#e0e0e0',
+            textSecondary: '#a0a0a0',
+            textMuted: '#6b6b6b',
+            border: '#333333',
+            accent: '#ffffff',
+            btnPrimaryBg: '#ffffff',
+            btnPrimaryText: '#000000',
+            btnPrimaryHover: '#e0e0e0',
+            tooltipBg: '#1a1a1a',
+            tooltipText: '#ffffff',
+            keyBg: 'rgba(255,255,255,0.1)',
         },
         light: {
             background: '#ffffff',
-            text: '#1a1a1a', textSecondary: '#555555', textMuted: '#888888',
-            border: '#e0e0e0', accent: '#000000',
-            btnPrimaryBg: '#1a1a1a', btnPrimaryText: '#ffffff', btnPrimaryHover: '#333333',
-            tooltipBg: '#1a1a1a', tooltipText: '#ffffff',
-            keyBg: 'rgba(0,0,0,0.1)'
+            text: '#1a1a1a',
+            textSecondary: '#555555',
+            textMuted: '#888888',
+            border: '#e0e0e0',
+            accent: '#000000',
+            btnPrimaryBg: '#1a1a1a',
+            btnPrimaryText: '#ffffff',
+            btnPrimaryHover: '#333333',
+            tooltipBg: '#1a1a1a',
+            tooltipText: '#ffffff',
+            keyBg: 'rgba(0,0,0,0.1)',
         },
         midnight: {
             background: '#0d1117',
-            text: '#c9d1d9', textSecondary: '#8b949e', textMuted: '#6e7681',
-            border: '#30363d', accent: '#58a6ff',
-            btnPrimaryBg: '#58a6ff', btnPrimaryText: '#0d1117', btnPrimaryHover: '#79b8ff',
-            tooltipBg: '#161b22', tooltipText: '#c9d1d9',
-            keyBg: 'rgba(88,166,255,0.15)'
+            text: '#c9d1d9',
+            textSecondary: '#8b949e',
+            textMuted: '#6e7681',
+            border: '#30363d',
+            accent: '#58a6ff',
+            btnPrimaryBg: '#58a6ff',
+            btnPrimaryText: '#0d1117',
+            btnPrimaryHover: '#79b8ff',
+            tooltipBg: '#161b22',
+            tooltipText: '#c9d1d9',
+            keyBg: 'rgba(88,166,255,0.15)',
         },
         sepia: {
             background: '#f4ecd8',
-            text: '#5c4b37', textSecondary: '#7a6a56', textMuted: '#998875',
-            border: '#d4c8b0', accent: '#8b4513',
-            btnPrimaryBg: '#5c4b37', btnPrimaryText: '#f4ecd8', btnPrimaryHover: '#7a6a56',
-            tooltipBg: '#5c4b37', tooltipText: '#f4ecd8',
-            keyBg: 'rgba(92,75,55,0.15)'
+            text: '#5c4b37',
+            textSecondary: '#7a6a56',
+            textMuted: '#998875',
+            border: '#d4c8b0',
+            accent: '#8b4513',
+            btnPrimaryBg: '#5c4b37',
+            btnPrimaryText: '#f4ecd8',
+            btnPrimaryHover: '#7a6a56',
+            tooltipBg: '#5c4b37',
+            tooltipText: '#f4ecd8',
+            keyBg: 'rgba(92,75,55,0.15)',
         },
         nord: {
             background: '#2e3440',
-            text: '#eceff4', textSecondary: '#d8dee9', textMuted: '#4c566a',
-            border: '#3b4252', accent: '#88c0d0',
-            btnPrimaryBg: '#88c0d0', btnPrimaryText: '#2e3440', btnPrimaryHover: '#8fbcbb',
-            tooltipBg: '#3b4252', tooltipText: '#eceff4',
-            keyBg: 'rgba(136,192,208,0.15)'
+            text: '#eceff4',
+            textSecondary: '#d8dee9',
+            textMuted: '#4c566a',
+            border: '#3b4252',
+            accent: '#88c0d0',
+            btnPrimaryBg: '#88c0d0',
+            btnPrimaryText: '#2e3440',
+            btnPrimaryHover: '#8fbcbb',
+            tooltipBg: '#3b4252',
+            tooltipText: '#eceff4',
+            keyBg: 'rgba(136,192,208,0.15)',
         },
         dracula: {
             background: '#282a36',
-            text: '#f8f8f2', textSecondary: '#bd93f9', textMuted: '#6272a4',
-            border: '#44475a', accent: '#ff79c6',
-            btnPrimaryBg: '#ff79c6', btnPrimaryText: '#282a36', btnPrimaryHover: '#ff92d0',
-            tooltipBg: '#44475a', tooltipText: '#f8f8f2',
-            keyBg: 'rgba(255,121,198,0.15)'
+            text: '#f8f8f2',
+            textSecondary: '#bd93f9',
+            textMuted: '#6272a4',
+            border: '#44475a',
+            accent: '#ff79c6',
+            btnPrimaryBg: '#ff79c6',
+            btnPrimaryText: '#282a36',
+            btnPrimaryHover: '#ff92d0',
+            tooltipBg: '#44475a',
+            tooltipText: '#f8f8f2',
+            keyBg: 'rgba(255,121,198,0.15)',
         },
         abyss: {
             background: '#0a0a0a',
-            text: '#d4d4d4', textSecondary: '#808080', textMuted: '#505050',
-            border: '#1a1a1a', accent: '#ffffff',
-            btnPrimaryBg: '#ffffff', btnPrimaryText: '#0a0a0a', btnPrimaryHover: '#d4d4d4',
-            tooltipBg: '#141414', tooltipText: '#d4d4d4',
-            keyBg: 'rgba(255,255,255,0.08)'
-        }
+            text: '#d4d4d4',
+            textSecondary: '#808080',
+            textMuted: '#505050',
+            border: '#1a1a1a',
+            accent: '#ffffff',
+            btnPrimaryBg: '#ffffff',
+            btnPrimaryText: '#0a0a0a',
+            btnPrimaryHover: '#d4d4d4',
+            tooltipBg: '#141414',
+            tooltipText: '#d4d4d4',
+            keyBg: 'rgba(255,255,255,0.08)',
+        },
     },
 
     current: 'dark',
@@ -978,29 +1085,31 @@ const theme = {
             sepia: 'Sepia',
             nord: 'Nord',
             dracula: 'Dracula',
-            abyss: 'Abyss'
+            abyss: 'Abyss',
         };
         return Object.keys(this.themes).map(key => ({
             value: key,
             name: names[key] || key,
-            colors: this.themes[key]
+            colors: this.themes[key],
         }));
     },
 
     hexToRgb(hex) {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-            r: parseInt(result[1], 16),
-            g: parseInt(result[2], 16),
-            b: parseInt(result[3], 16)
-        } : { r: 30, g: 30, b: 30 };
+        return result
+            ? {
+                  r: parseInt(result[1], 16),
+                  g: parseInt(result[2], 16),
+                  b: parseInt(result[3], 16),
+              }
+            : { r: 30, g: 30, b: 30 };
     },
 
     lightenColor(rgb, amount) {
         return {
             r: Math.min(255, rgb.r + amount),
             g: Math.min(255, rgb.g + amount),
-            b: Math.min(255, rgb.b + amount)
+            b: Math.min(255, rgb.b + amount),
         };
     },
 
@@ -1008,7 +1117,7 @@ const theme = {
         return {
             r: Math.max(0, rgb.r - amount),
             g: Math.max(0, rgb.g - amount),
-            b: Math.max(0, rgb.b - amount)
+            b: Math.max(0, rgb.b - amount),
         };
     },
 
@@ -1088,7 +1197,7 @@ const theme = {
     async save(themeName) {
         await storage.updatePreference('theme', themeName);
         this.apply(themeName);
-    }
+    },
 };
 
 // Consolidated cheatingDaddy object - all functions in one place
@@ -1118,6 +1227,9 @@ const cheatingDaddy = {
 
     // Storage API
     storage,
+
+    // Prompts API
+    prompts,
 
     // Theme API
     theme,

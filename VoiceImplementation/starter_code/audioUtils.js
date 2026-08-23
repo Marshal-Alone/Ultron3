@@ -62,13 +62,13 @@ function createWavHeader(dataSize, sampleRate = 24000, channels = 1, bitDepth = 
 
     // "fmt " Subchunk
     header.write('fmt ', 12);
-    header.writeUInt32LE(16, 16);          // Subchunk1Size (16 for PCM)
-    header.writeUInt16LE(1, 20);           // AudioFormat (1 for PCM)
-    header.writeUInt16LE(channels, 22);    // NumChannels
-    header.writeUInt32LE(sampleRate, 24);  // SampleRate
-    header.writeUInt32LE(byteRate, 28);    // ByteRate
-    header.writeUInt16LE(blockAlign, 32);  // BlockAlign
-    header.writeUInt16LE(bitDepth, 34);    // BitsPerSample
+    header.writeUInt32LE(16, 16); // Subchunk1Size (16 for PCM)
+    header.writeUInt16LE(1, 20); // AudioFormat (1 for PCM)
+    header.writeUInt16LE(channels, 22); // NumChannels
+    header.writeUInt32LE(sampleRate, 24); // SampleRate
+    header.writeUInt32LE(byteRate, 28); // ByteRate
+    header.writeUInt16LE(blockAlign, 32); // BlockAlign
+    header.writeUInt16LE(bitDepth, 34); // BitsPerSample
 
     // "data" Subchunk
     header.write('data', 36);

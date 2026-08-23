@@ -48,7 +48,7 @@ function isProviderAvailable(provider) {
     if (provider === 'groq') {
         return !!storage.getGroqApiKey();
     }
-    return !!storage.getApiKey();  // Gemini
+    return !!storage.getApiKey(); // Gemini
 }
 
 /**

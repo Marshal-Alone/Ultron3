@@ -84,7 +84,7 @@ class AudioCaptureEngine {
         let audioBuffer = [];
         const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION; // 2400 samples
 
-        this.audioProcessor.onaudioprocess = async (event) => {
+        this.audioProcessor.onaudioprocess = async event => {
             if (!this.isCapturing) return;
             const inputData = event.inputBuffer.getChannelData(0);
             audioBuffer.push(...inputData);
@@ -126,7 +126,7 @@ class AudioCaptureEngine {
             let micBuffer = [];
             const samplesPerChunk = SAMPLE_RATE * AUDIO_CHUNK_DURATION;
 
-            this.micAudioProcessor.onaudioprocess = async (event) => {
+            this.micAudioProcessor.onaudioprocess = async event => {
                 if (!this.isCapturing) return;
                 const inputData = event.inputBuffer.getChannelData(0);
                 micBuffer.push(...inputData);

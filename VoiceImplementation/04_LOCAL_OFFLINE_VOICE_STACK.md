@@ -3,6 +3,7 @@
 ## 1. Overview & Offline Architecture
 
 For situations requiring **absolute privacy**, **zero internet dependency**, or **no third-party API costs**, the system implements a native, embedded local AI pipeline using:
+
 1. **Real-Time Voice Activity Detection (VAD)**: Continuously evaluates energy levels (RMS) to detect speech onset and conclusion.
 2. **Audio Resampling Engine**: Resamples audio from 24,000 Hz to 16,000 Hz in real-time.
 3. **`whisper.cpp` Server**: High-performance C++ speech-to-text inference running locally.
@@ -46,6 +47,7 @@ For situations requiring **absolute privacy**, **zero internet dependency**, or 
 ## 2. Audio Resampling & Voice Activity Detection (VAD)
 
 ### A. Linear Interpolation Resampler (24kHz to 16kHz)
+
 Whisper models strictly require 16,000 Hz single-channel audio. The resampler downsamples 24kHz to 16kHz on the fly:
 
 ```javascript
@@ -62,27 +64,24 @@ function resample24kTo16k(inputBuffer) {
         const sourcePosition = (i * 3) / 2;
         const sourceIndex = Math.floor(sourcePosition);
         const fraction = sourcePosition - sourceIndex;
-        
+
         const firstSample = combined.readInt16LE(sourceIndex * 2);
-        const secondSample = sourceIndex + 1 < inputSamples 
-            ? combined.readInt16LE((sourceIndex + 1) * 2) 
-            : firstSample;
-            
+        const secondSample = sourceIndex + 1 < inputSamples ? combined.readInt16LE((sourceIndex + 1) * 2) : firstSample;
+
         const interpolated = Math.round(firstSample + fraction * (secondSample - firstSample));
         outputBuffer.writeInt16LE(Math.max(-32768, Math.min(32767, interpolated)), i * 2);
     }
 
     const consumedInputSamples = Math.ceil((outputSamples * 3) / 2);
     const remainderStart = consumedInputSamples * 2;
-    resampleRemainder = remainderStart < combined.length 
-        ? combined.slice(remainderStart) 
-        : Buffer.alloc(0);
+    resampleRemainder = remainderStart < combined.length ? combined.slice(remainderStart) : Buffer.alloc(0);
 
     return outputBuffer;
 }
 ```
 
 ### B. Energy / RMS Calculation
+
 ```javascript
 function calculateRms(pcm16Buffer) {
     const samples = pcm16Buffer.length / 2;
@@ -99,11 +98,12 @@ function calculateRms(pcm16Buffer) {
 ```
 
 ### C. VAD State Machine
+
 ```javascript
 const VAD_MODES = {
-    NORMAL:          { energyThreshold: 0.010, speechFramesRequired: 3, silenceFramesRequired: 30 },
-    AGGRESSIVE:      { energyThreshold: 0.015, speechFramesRequired: 2, silenceFramesRequired: 20 },
-    VERY_AGGRESSIVE: { energyThreshold: 0.020, speechFramesRequired: 2, silenceFramesRequired: 15 },
+    NORMAL: { energyThreshold: 0.01, speechFramesRequired: 3, silenceFramesRequired: 30 },
+    AGGRESSIVE: { energyThreshold: 0.015, speechFramesRequired: 2, silenceFramesRequired: 20 },
+    VERY_AGGRESSIVE: { energyThreshold: 0.02, speechFramesRequired: 2, silenceFramesRequired: 15 },
 };
 
 let vadConfig = VAD_MODES.VERY_AGGRESSIVE;
@@ -136,7 +136,7 @@ function processVad(pcm16kBuffer) {
             speechBuffers = [];
             console.log('[LocalAI] Speech ended. Total bytes:', audioData.length);
             sendToRenderer('update-status', 'Transcribing...');
-            
+
             // Dispatch to Whisper
             handleSpeechEnd(audioData);
             return;
@@ -165,12 +165,12 @@ function createWavBuffer(pcm16Buffer) {
     header.write('WAVE', 8);
     header.write('fmt ', 12);
     header.writeUInt32LE(16, 16);
-    header.writeUInt16LE(1, 20);      // PCM
-    header.writeUInt16LE(1, 22);      // Mono
-    header.writeUInt32LE(16000, 24);  // 16kHz
+    header.writeUInt16LE(1, 20); // PCM
+    header.writeUInt16LE(1, 22); // Mono
+    header.writeUInt32LE(16000, 24); // 16kHz
     header.writeUInt32LE(byteRate, 28);
-    header.writeUInt16LE(2, 32);      // Block align
-    header.writeUInt16LE(16, 34);     // Bits per sample
+    header.writeUInt16LE(2, 32); // Block align
+    header.writeUInt16LE(16, 34); // Bits per sample
     header.write('data', 36);
     header.writeUInt32LE(pcm16Buffer.length, 40);
 

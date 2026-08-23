@@ -3,7 +3,11 @@ import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 export class AppHeader extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family:
+                'Inter',
+                -apple-system,
+                BlinkMacSystemFont,
+                sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -181,6 +185,26 @@ export class AppHeader extends LitElement {
             content: '⚡';
             font-size: 10px;
         }
+
+        .waveform-container {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 18px;
+            width: 54px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 9px;
+            padding: 0 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            -webkit-app-region: no-drag;
+        }
+
+        .waveform-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
     `;
 
     static properties = {
@@ -210,19 +234,24 @@ export class AppHeader extends LitElement {
         this.startTime = null;
         this.backgroundTransparency = 0.8;
         this.isNavbarHidden = false;
-        this.onCustomizeClick = () => { };
-        this.onHelpClick = () => { };
-        this.onHistoryClick = () => { };
-        this.onCloseClick = () => { };
-        this.onBackClick = () => { };
-        this.onHideToggleClick = () => { };
+        this.onCustomizeClick = () => {};
+        this.onHelpClick = () => {};
+        this.onHistoryClick = () => {};
+        this.onCloseClick = () => {};
+        this.onBackClick = () => {};
+        this.onHideToggleClick = () => {};
         this.isClickThrough = false;
         this.updateAvailable = false;
         this._timerInterval = null;
         this.aiProvider = 'gemini';
-        // Invigilator Mode defaults
         this.invigilatorModeActive = false;
         this.invigilatorTypingMode = 'charByChar';
+
+        this._waveformAnimFrame = null;
+        this._audioActivityListener = null;
+        this._targetRms = 0.05;
+        this._currentRms = 0.05;
+
         this._loadAiProvider();
     }
 
@@ -254,6 +283,76 @@ export class AppHeader extends LitElement {
             };
             ipcRenderer.on('ai-provider-changed', this._handleProviderChanged);
         }
+
+        // Listen for audio-activity events for the sound-reactive waveform
+        this._audioActivityListener = e => {
+            if (e.detail?.rms !== undefined) {
+                this._targetRms = Math.max(0.05, Math.min(1.0, e.detail.rms * 8));
+            }
+        };
+        window.addEventListener('audio-activity', this._audioActivityListener);
+    }
+
+    firstUpdated() {
+        super.firstUpdated();
+        this._initWaveform();
+    }
+
+    _initWaveform() {
+        const canvas = this.shadowRoot.querySelector('#waveformCanvas');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = 54 * dpr;
+        canvas.height = 18 * dpr;
+        ctx.scale(dpr, dpr);
+
+        const w = 54;
+        const h = 18;
+        const startTime = performance.now();
+
+        const waves = [
+            { freq: 2.5, amp: 0.35, speed: 3.0, color: '#3B82F6', width: 1.5, opacity: 0.9 },
+            { freq: 4.5, amp: 0.22, speed: 4.0, color: '#60A5FA', width: 1.0, opacity: 0.6 },
+            { freq: 6.0, amp: 0.15, speed: 5.5, color: '#93C5FD', width: 0.8, opacity: 0.35 },
+        ];
+
+        const draw = now => {
+            const elapsed = (now - startTime) / 1000;
+            ctx.clearRect(0, 0, w, h);
+
+            this._currentRms += (this._targetRms - this._currentRms) * 0.15;
+            this._targetRms = Math.max(0.05, this._targetRms * 0.93);
+
+            const midY = h / 2;
+            const dynamicScale = Math.max(0.2, this._currentRms);
+
+            for (const wave of waves) {
+                ctx.beginPath();
+                ctx.globalAlpha = wave.opacity;
+                ctx.strokeStyle = wave.color;
+                ctx.lineWidth = wave.width;
+                ctx.lineCap = 'round';
+
+                for (let x = 0; x <= w; x++) {
+                    const norm = x / w;
+                    const envelope = Math.sin(norm * Math.PI); // Tapers ends
+                    const y =
+                        midY + Math.sin(norm * Math.PI * 2 * wave.freq + elapsed * wave.speed) * (midY * wave.amp * dynamicScale * 2.5) * envelope;
+                    if (x === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+
+            this._waveformAnimFrame = requestAnimationFrame(draw);
+        };
+
+        if (this._waveformAnimFrame) {
+            cancelAnimationFrame(this._waveformAnimFrame);
+        }
+        this._waveformAnimFrame = requestAnimationFrame(draw);
     }
 
     async _checkForUpdates() {
@@ -295,7 +394,15 @@ export class AppHeader extends LitElement {
         super.disconnectedCallback();
         this._stopTimer();
 
-        // Clean up IPC listener
+        if (this._waveformAnimFrame) {
+            cancelAnimationFrame(this._waveformAnimFrame);
+            this._waveformAnimFrame = null;
+        }
+
+        if (this._audioActivityListener) {
+            window.removeEventListener('audio-activity', this._audioActivityListener);
+        }
+
         if (window.require && this._handleProviderChanged) {
             const { ipcRenderer } = window.require('electron');
             ipcRenderer.removeListener('ai-provider-changed', this._handleProviderChanged);
@@ -305,16 +412,15 @@ export class AppHeader extends LitElement {
     updated(changedProperties) {
         super.updated(changedProperties);
 
-        // Start/stop timer based on view change
         if (changedProperties.has('currentView')) {
             if (this.currentView === 'assistant' && this.startTime) {
                 this._startTimer();
             } else {
                 this._stopTimer();
             }
+            setTimeout(() => this._initWaveform(), 50);
         }
 
-        // Start timer when startTime is set
         if (changedProperties.has('startTime')) {
             if (this.startTime && this.currentView === 'assistant') {
                 this._startTimer();
@@ -325,15 +431,11 @@ export class AppHeader extends LitElement {
     }
 
     _startTimer() {
-        // Clear any existing timer
         this._stopTimer();
-
-        // Only start timer if we're in assistant view and have a start time
         if (this.currentView === 'assistant' && this.startTime) {
             this._timerInterval = setInterval(() => {
-                // Trigger a re-render by requesting an update
                 this.requestUpdate();
-            }, 1000); // Update every second
+            }, 1000);
         }
     }
 
@@ -383,7 +485,6 @@ export class AppHeader extends LitElement {
             await window.cheatingDaddy.storage.updatePreference('aiProvider', newProvider);
         }
 
-        // Notify other components (like CustomizeView)
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
             ipcRenderer.send('ai-provider-changed-notify', newProvider);
@@ -397,73 +498,93 @@ export class AppHeader extends LitElement {
         const shouldHideHeader = this.isNavbarHidden && this.currentView === 'assistant';
         const headerClass = shouldHideHeader ? 'header hidden' : 'header';
 
-        // Get invigilator mode indicator class
         const modeLabels = {
-            'charByChar': 'Char by Char',
-            'wordByWord': 'Word by Word',
-            'lineByLine': 'Line by Line',
-            'instant': 'Instant'
+            charByChar: 'Char by Char',
+            wordByWord: 'Word by Word',
+            lineByLine: 'Line by Line',
+            instant: 'Instant',
         };
-        const indicatorClass = this.invigilatorModeActive
-            ? 'invigilator-mode-indicator'
-            : 'invigilator-mode-indicator inactive';
-        const indicatorLabel = this.invigilatorModeActive
-            ? (modeLabels[this.invigilatorTypingMode] || this.invigilatorTypingMode)
-            : 'Invigilator OFF';
+        const indicatorClass = this.invigilatorModeActive ? 'invigilator-mode-indicator' : 'invigilator-mode-indicator inactive';
+        const indicatorLabel = this.invigilatorModeActive ? modeLabels[this.invigilatorTypingMode] || this.invigilatorTypingMode : 'Invigilator OFF';
 
         return html`
             <div class="${headerClass}">
                 <div class="header-title">${this.getViewTitle()}</div>
                 <div class="header-actions">
                     ${this.invigilatorModeActive ? html`<div class="${indicatorClass}" title="Invigilator Mode: ${indicatorLabel}">${indicatorLabel}</div>` : ''}
-                    ${this.currentView === 'assistant'
-                ? html`
-                              <div class="provider-badge ${this.aiProvider}" @click=${this._toggleAiProvider} title="Click to switch AI provider">
-                                  ${this.aiProvider === 'gemini' ? 'Gemini' : 'Groq'}
-                              </div>
-                              <span>${elapsedTime}</span>
-                              <span>${this.statusText}</span>
-                              ${this.isClickThrough ? html`<span class="click-through-indicator">click-through</span>` : ''}
-                          `
-                : ''}
-                    ${this.currentView === 'main'
-                ? html`
-                              <button class="icon-button" @click=${this.onHistoryClick}>
-                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                      <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd" />
-                                  </svg>
-                              </button>
-                              <button class="icon-button" @click=${this.onCustomizeClick}>
-                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                      <path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
-                                  </svg>
-                              </button>
-                              <button class="icon-button" @click=${this.onHelpClick}>
-                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                      <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0ZM8.94 6.94a.75.75 0 1 1-1.061-1.061 3 3 0 1 1 2.871 5.026v.345a.75.75 0 0 1-1.5 0v-.5c0-.72.57-1.172 1.081-1.287A1.5 1.5 0 1 0 8.94 6.94ZM10 15a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
-                                  </svg>
-                              </button>
-                          `
-                : ''}
-                    ${this.currentView === 'assistant'
-                ? html`
-                              <button @click=${this.onHideToggleClick} class="button">
-                                  Hide&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheatingDaddy.isMacOS ? 'Cmd' : 'Ctrl'}</span
-                                  >&nbsp;&nbsp;<span class="key">&bsol;</span>
-                              </button>
-                              <button @click=${this.onCloseClick} class="icon-button window-close">
-                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                      <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-                                  </svg>
-                              </button>
-                          `
-                : html`
-                              <button @click=${this.isNavigationView() ? this.onBackClick : this.onCloseClick} class="icon-button window-close">
-                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                      <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-                                  </svg>
-                              </button>
-                          `}
+                    ${
+                        this.currentView === 'assistant'
+                            ? html`
+                                  <div class="waveform-container" title="Audio Listening Waveform">
+                                      <canvas id="waveformCanvas" class="waveform-canvas" width="54" height="18"></canvas>
+                                  </div>
+                                  <div class="provider-badge ${this.aiProvider}" @click=${this._toggleAiProvider} title="Click to switch AI provider">
+                                      ${this.aiProvider === 'gemini' ? 'Gemini' : 'Groq'}
+                                  </div>
+                                  <span>${elapsedTime}</span>
+                                  <span>${this.statusText}</span>
+                                  ${this.isClickThrough ? html`<span class="click-through-indicator">click-through</span>` : ''}
+                              `
+                            : ''
+                    }
+                    ${
+                        this.currentView === 'main'
+                            ? html`
+                                  <button class="icon-button" @click=${this.onHistoryClick}>
+                                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                          <path
+                                              fill-rule="evenodd"
+                                              d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z"
+                                              clip-rule="evenodd"
+                                          />
+                                      </svg>
+                                  </button>
+                                  <button class="icon-button" @click=${this.onCustomizeClick}>
+                                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                          <path
+                                              fill-rule="evenodd"
+                                              d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
+                                              clip-rule="evenodd"
+                                          />
+                                      </svg>
+                                  </button>
+                                  <button class="icon-button" @click=${this.onHelpClick}>
+                                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                          <path
+                                              fill-rule="evenodd"
+                                              d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0ZM8.94 6.94a.75.75 0 1 1-1.061-1.061 3 3 0 1 1 2.871 5.026v.345a.75.75 0 0 1-1.5 0v-.5c0-.72.57-1.172 1.081-1.287A1.5 1.5 0 1 0 8.94 6.94ZM10 15a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"
+                                              clip-rule="evenodd"
+                                          />
+                                      </svg>
+                                  </button>
+                              `
+                            : ''
+                    }
+                    ${
+                        this.currentView === 'assistant'
+                            ? html`
+                                  <button @click=${this.onHideToggleClick} class="button">
+                                      Hide&nbsp;&nbsp;<span class="key" style="pointer-events: none;">${cheatingDaddy.isMacOS ? 'Cmd' : 'Ctrl'}</span
+                                      >&nbsp;&nbsp;<span class="key">&bsol;</span>
+                                  </button>
+                                  <button @click=${this.onCloseClick} class="icon-button window-close">
+                                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                          <path
+                                              d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"
+                                          />
+                                      </svg>
+                                  </button>
+                              `
+                            : html`
+                                  <button @click=${this.isNavigationView() ? this.onBackClick : this.onCloseClick} class="icon-button window-close">
+                                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                          <path
+                                              d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"
+                                          />
+                                      </svg>
+                                  </button>
+                              `
+                    }
                 </div>
             </div>
         `;

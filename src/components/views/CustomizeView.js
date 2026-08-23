@@ -4,7 +4,11 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class CustomizeView extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family:
+                'Inter',
+                -apple-system,
+                BlinkMacSystemFont,
+                sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -547,6 +551,40 @@ export class CustomizeView extends LitElement {
             color: var(--error-color);
             border-left: 2px solid var(--error-color);
         }
+
+        .primary-save-button {
+            background: var(--accent-color, #3b82f6);
+            color: #ffffff;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.15s ease;
+        }
+
+        .primary-save-button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .primary-save-button:active {
+            transform: translateY(0);
+        }
+
+        .save-feedback-badge {
+            display: inline-flex;
+            align-items: center;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--success-color, #10b981);
+            margin-left: 10px;
+            animation: fadeIn 0.2s ease;
+        }
     `;
 
     static properties = {
@@ -573,6 +611,10 @@ export class CustomizeView extends LitElement {
         openRouterApiKey: { type: String },
         holdToTypeEnabled: { type: Boolean },
         holdToTypeKey: { type: String },
+        systemInstruction: { type: String },
+        developerInstruction: { type: String },
+        fullSystemPrompt: { type: String },
+        saveFeedbackMessage: { type: String },
     };
 
     constructor() {
@@ -582,10 +624,10 @@ export class CustomizeView extends LitElement {
         this.selectedImageQuality = 'medium';
         this.layoutMode = 'normal';
         this.keybinds = this.getDefaultKeybinds();
-        this.onProfileChange = () => { };
-        this.onLanguageChange = () => { };
-        this.onImageQualityChange = () => { };
-        this.onLayoutModeChange = () => { };
+        this.onProfileChange = () => {};
+        this.onLanguageChange = () => {};
+        this.onImageQualityChange = () => {};
+        this.onLayoutModeChange = () => {};
 
         // Google Search default
         this.googleSearchEnabled = true;
@@ -607,8 +649,12 @@ export class CustomizeView extends LitElement {
         // Audio mode default
         this.audioMode = 'speaker_only';
 
-        // Custom prompt
+        // Instructions & Prompts
         this.customPrompt = '';
+        this.systemInstruction = '';
+        this.developerInstruction = '';
+        this.fullSystemPrompt = '';
+        this.saveFeedbackMessage = '';
 
         // Active section for sidebar navigation
         this.activeSection = 'profile';
@@ -619,7 +665,6 @@ export class CustomizeView extends LitElement {
         // AI Provider default
         this.aiProvider = 'gemini';
         this.groqApiKey = '';
-                this.openRouterApiKey = '';
         this.openRouterApiKey = '';
 
         this.holdToTypeEnabled = false;
@@ -653,31 +698,87 @@ export class CustomizeView extends LitElement {
 
     renderSidebarIcon(icon) {
         const icons = {
-            user: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M19 21V19C19 17.9391 18.5786 16.9217 17.8284 16.1716C17.0783 15.4214 16.0609 15 15 15H9C7.93913 15 6.92172 15.4214 6.17157 16.1716C5.42143 16.9217 5 17.9391 5 19V21"></path>
+            user: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <path
+                    d="M19 21V19C19 17.9391 18.5786 16.9217 17.8284 16.1716C17.0783 15.4214 16.0609 15 15 15H9C7.93913 15 6.92172 15.4214 6.17157 16.1716C5.42143 16.9217 5 17.9391 5 19V21"
+                ></path>
                 <circle cx="12" cy="7" r="4"></circle>
             </svg>`,
-            mic: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            mic: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                 <line x1="12" y1="19" x2="12" y2="23"></line>
                 <line x1="8" y1="23" x2="16" y2="23"></line>
             </svg>`,
-            globe: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            globe: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <circle cx="12" cy="12" r="10"></circle>
                 <line x1="2" y1="12" x2="22" y2="12"></line>
                 <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
             </svg>`,
-            display: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            display: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
                 <line x1="8" y1="21" x2="16" y2="21"></line>
                 <line x1="12" y1="17" x2="12" y2="21"></line>
             </svg>`,
-            camera: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            camera: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
                 <circle cx="12" cy="13" r="4"></circle>
             </svg>`,
-            keyboard: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            keyboard: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
                 <path d="M6 8h.001"></path>
                 <path d="M10 8h.001"></path>
@@ -688,16 +789,43 @@ export class CustomizeView extends LitElement {
                 <path d="M16 12h.001"></path>
                 <path d="M7 16h10"></path>
             </svg>`,
-            search: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            search: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>`,
-            warning: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            warning: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
                 <line x1="12" y1="9" x2="12" y2="13"></line>
                 <line x1="12" y1="17" x2="12.01" y2="17"></line>
             </svg>`,
-            ai: html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            ai: html`<svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
                 <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
                 <path d="M2 17l10 5 10-5"></path>
                 <path d="M2 12l10 5 10-5"></path>
@@ -708,17 +836,18 @@ export class CustomizeView extends LitElement {
 
     async _loadFromStorage() {
         try {
-            const [prefs, keybinds] = await Promise.all([
-                cheatingDaddy.storage.getPreferences(),
-                cheatingDaddy.storage.getKeybinds()
-            ]);
+            const [prefs, keybinds] = await Promise.all([cheatingDaddy.storage.getPreferences(), cheatingDaddy.storage.getKeybinds()]);
 
+            this.selectedProfile = prefs.selectedProfile ?? 'interview';
             this.googleSearchEnabled = prefs.googleSearchEnabled ?? true;
             this.backgroundTransparency = prefs.backgroundTransparency ?? 0.8;
             this.textOpacity = prefs.textOpacity ?? 1;
             this.fontSize = prefs.fontSize ?? 20;
             this.audioMode = prefs.audioMode ?? 'speaker_only';
             this.customPrompt = prefs.customPrompt ?? '';
+            this.systemInstruction = prefs.systemInstruction ?? '';
+            this.developerInstruction = prefs.developerInstruction ?? '';
+            this.fullSystemPrompt = prefs.fullSystemPrompt ?? '';
             this.theme = prefs.theme ?? 'dark';
             this.aiProvider = prefs.aiProvider ?? 'gemini';
             this.holdToTypeEnabled = prefs.holdToTypeEnabled ?? false;
@@ -734,7 +863,6 @@ export class CustomizeView extends LitElement {
                 console.log('Groq API key not available');
                 this.groqApiKey = '';
                 this.openRouterApiKey = '';
-        this.openRouterApiKey = '';
             }
 
             if (keybinds) {
@@ -751,6 +879,8 @@ export class CustomizeView extends LitElement {
 
     connectedCallback() {
         super.connectedCallback();
+        // Always refresh latest settings from storage on mount
+        this._loadFromStorage();
         // Resize window for this view
         resizeLayout();
 
@@ -897,6 +1027,7 @@ export class CustomizeView extends LitElement {
         const isMac = cheatingDaddy.isMacOS || navigator.platform.includes('Mac');
         return {
             // Main shortcuts (Quick Controls)
+            toggleListenAnswer: isMac ? 'Cmd+Space' : 'Ctrl+Space',
             quickStartGroq: isMac ? 'Cmd+Shift+S' : 'Ctrl+Shift+S',
             quickStop: isMac ? 'Alt+S' : 'Alt+S',
             killSwitch: isMac ? 'Cmd+Shift+Delete' : 'Ctrl+Shift+Delete',
@@ -968,6 +1099,12 @@ export class CustomizeView extends LitElement {
     getKeybindActions() {
         return [
             // Main Shortcuts (Quick Controls)
+            {
+                key: 'toggleListenAnswer',
+                name: 'Toggle Listen & Instant Answer',
+                description: 'Press to start listening; press again when question finishes to answer ASAP',
+                category: 'main',
+            },
             {
                 key: 'quickStartGroq',
                 name: 'Quick Start Groq',
@@ -1287,8 +1424,6 @@ export class CustomizeView extends LitElement {
         this.requestUpdate();
     }
 
-    
-
     async handleGroqApiKeyChange(e) {
         this.groqApiKey = e.target.value;
         try {
@@ -1384,6 +1519,116 @@ export class CustomizeView extends LitElement {
         root.style.setProperty('--response-font-size', `${this.fontSize}px`);
     }
 
+    getProfiles() {
+        return [
+            { value: 'interview', name: 'Job Interview' },
+            { value: 'sales', name: 'Sales Call' },
+            { value: 'meeting', name: 'Business Meeting' },
+            { value: 'presentation', name: 'Presentation Coach' },
+            { value: 'negotiation', name: 'Deal Negotiation' },
+            { value: 'exam', name: 'Exam / Test Assistant' },
+        ];
+    }
+
+    getProfileNames() {
+        return {
+            interview: 'Job Interview',
+            sales: 'Sales Call',
+            meeting: 'Business Meeting',
+            presentation: 'Presentation Coach',
+            negotiation: 'Deal Negotiation',
+            exam: 'Exam / Test Assistant',
+        };
+    }
+
+    async handleProfileSelect(e) {
+        this.selectedProfile = e.target.value;
+        await cheatingDaddy.storage.updatePreference('selectedProfile', this.selectedProfile);
+        if (this.onProfileChange) {
+            this.onProfileChange(this.selectedProfile);
+        }
+        this.requestUpdate();
+    }
+
+    async handleSystemInstructionInput(e) {
+        this.systemInstruction = e.target.value;
+        await cheatingDaddy.storage.updatePreference('systemInstruction', this.systemInstruction);
+    }
+
+    async handleDeveloperInstructionInput(e) {
+        this.developerInstruction = e.target.value;
+        await cheatingDaddy.storage.updatePreference('developerInstruction', this.developerInstruction);
+    }
+
+    async handleCustomPromptInput(e) {
+        this.customPrompt = e.target.value;
+        await cheatingDaddy.storage.updatePreference('customPrompt', this.customPrompt);
+    }
+
+    async handleFullSystemPromptInput(e) {
+        this.fullSystemPrompt = e.target.value;
+        await cheatingDaddy.storage.updatePreference('fullSystemPrompt', this.fullSystemPrompt);
+    }
+
+    async handleResetSystemInstruction() {
+        this.systemInstruction = '';
+        await cheatingDaddy.storage.updatePreference('systemInstruction', '');
+        this.requestUpdate();
+    }
+
+    async handleResetDeveloperInstruction() {
+        this.developerInstruction = '';
+        await cheatingDaddy.storage.updatePreference('developerInstruction', '');
+        this.requestUpdate();
+    }
+
+    async handleResetCustomPrompt() {
+        this.customPrompt = '';
+        await cheatingDaddy.storage.updatePreference('customPrompt', '');
+        this.requestUpdate();
+    }
+
+    async handleLoadDefaultPrompt() {
+        if (cheatingDaddy.prompts?.getDefaultSystemPrompt) {
+            const defaultPrompt = await cheatingDaddy.prompts.getDefaultSystemPrompt(this.selectedProfile);
+            this.fullSystemPrompt = defaultPrompt;
+            await cheatingDaddy.storage.updatePreference('fullSystemPrompt', this.fullSystemPrompt);
+            this.saveFeedbackMessage = '✓ Default system prompt loaded into editor!';
+            this.requestUpdate();
+            setTimeout(() => {
+                this.saveFeedbackMessage = '';
+                this.requestUpdate();
+            }, 3500);
+        }
+    }
+
+    async handleClearFullSystemPrompt() {
+        this.fullSystemPrompt = '';
+        await cheatingDaddy.storage.updatePreference('fullSystemPrompt', '');
+        this.saveFeedbackMessage = '✓ Cleared! Using modular profile instructions';
+        this.requestUpdate();
+        setTimeout(() => {
+            this.saveFeedbackMessage = '';
+            this.requestUpdate();
+        }, 3500);
+    }
+
+    async handleSaveAllInstructions() {
+        await Promise.all([
+            cheatingDaddy.storage.updatePreference('systemInstruction', this.systemInstruction || ''),
+            cheatingDaddy.storage.updatePreference('developerInstruction', this.developerInstruction || ''),
+            cheatingDaddy.storage.updatePreference('customPrompt', this.customPrompt || ''),
+            cheatingDaddy.storage.updatePreference('fullSystemPrompt', this.fullSystemPrompt || ''),
+            cheatingDaddy.storage.updatePreference('selectedProfile', this.selectedProfile || 'interview'),
+        ]);
+        this.saveFeedbackMessage = '✓ All instructions and system prompts saved!';
+        this.requestUpdate();
+        setTimeout(() => {
+            this.saveFeedbackMessage = '';
+            this.requestUpdate();
+        }, 3500);
+    }
+
     renderProfileSection() {
         const profiles = this.getProfiles();
         const profileNames = this.getProfileNames();
@@ -1391,7 +1636,7 @@ export class CustomizeView extends LitElement {
 
         return html`
             <div class="profile-section">
-                <div class="content-header">AI Profile</div>
+                <div class="content-header">AI Profile & System Prompts</div>
                 <div class="form-grid">
                     <div class="form-group">
                         <label class="form-label">
@@ -1400,27 +1645,113 @@ export class CustomizeView extends LitElement {
                         </label>
                         <select class="form-control" .value=${this.selectedProfile} @change=${this.handleProfileSelect}>
                             ${profiles.map(
-            profile => html`
-                                    <option value=${profile.value} ?selected=${this.selectedProfile === profile.value}>
-                                        ${profile.name}
-                                    </option>
+                                profile => html`
+                                    <option value=${profile.value} ?selected=${this.selectedProfile === profile.value}>${profile.name}</option>
                                 `
-        )}
+                            )}
                         </select>
+                        <div class="form-description">Select the domain context for the AI assistant</div>
                     </div>
 
-                    <div class="form-group expand">
-                        <label class="form-label">Custom AI Instructions</label>
+                    <div class="form-group">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <label class="form-label">System Instruction (Base Persona)</label>
+                            <button class="reset-color-button" style="font-size: 10px; padding: 2px 6px;" @click=${this.handleResetSystemInstruction}>
+                                Reset to Default
+                            </button>
+                        </div>
                         <textarea
                             class="form-control"
-                            placeholder="Add specific instructions for how you want the AI to behave during ${profileNames[this.selectedProfile] || 'this interaction'
-            }..."
+                            rows="3"
+                            placeholder="Default ${profileNames[this.selectedProfile] || 'profile'} persona will be used if left blank..."
+                            .value=${this.systemInstruction}
+                            @input=${this.handleSystemInstructionInput}
+                        ></textarea>
+                        <div class="form-description">
+                            Override the base role and tone of the AI (e.g. 'Senior Staff Engineer, deliver direct, concise talking points')
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <label class="form-label">Developer / Meta Instructions</label>
+                            <button
+                                class="reset-color-button"
+                                style="font-size: 10px; padding: 2px 6px;"
+                                @click=${this.handleResetDeveloperInstruction}
+                            >
+                                Reset
+                            </button>
+                        </div>
+                        <textarea
+                            class="form-control"
+                            rows="3"
+                            placeholder="e.g. Think silently. Keep responses under 3 bullet points. Emphasize time/space complexity. Always output clean markdown..."
+                            .value=${this.developerInstruction}
+                            @input=${this.handleDeveloperInstructionInput}
+                        ></textarea>
+                        <div class="form-description">Custom rules for reasoning, brevity, output formatting, and constraints</div>
+                    </div>
+
+                    <div class="form-group">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <label class="form-label">User Context / Custom Instructions</label>
+                            <button class="reset-color-button" style="font-size: 10px; padding: 2px 6px;" @click=${this.handleResetCustomPrompt}>
+                                Clear
+                            </button>
+                        </div>
+                        <textarea
+                            class="form-control"
+                            rows="3"
+                            placeholder="Add specific instructions, background context, resume details, or tech stack for ${profileNames[this.selectedProfile] || 'this session'}..."
                             .value=${this.customPrompt}
                             @input=${this.handleCustomPromptInput}
                         ></textarea>
-                        <div class="form-description">
-                            Personalize the AI's behavior with specific instructions
+                        <div class="form-description">Personalize responses with your background, job description, or resume</div>
+                    </div>
+
+                    <div class="form-group" style="border-top: 1px solid var(--border-color, #333); padding-top: 14px; margin-top: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label class="form-label" style="margin-bottom: 0;"> Full System Prompt (Direct Override) </label>
+                            <div style="display: flex; gap: 6px;">
+                                <button
+                                    class="reset-color-button"
+                                    style="font-size: 10px; padding: 3px 8px; color: var(--accent-color, #3b82f6);"
+                                    @click=${this.handleLoadDefaultPrompt}
+                                >
+                                    Load Default Prompt
+                                </button>
+                                <button
+                                    class="reset-color-button"
+                                    style="font-size: 10px; padding: 3px 8px;"
+                                    @click=${this.handleClearFullSystemPrompt}
+                                >
+                                    Clear Override
+                                </button>
+                            </div>
                         </div>
+                        <textarea
+                            class="form-control"
+                            rows="6"
+                            placeholder="Click 'Load Default Prompt' above to view and edit the entire built-in prompt directly, or type a complete custom prompt here..."
+                            .value=${this.fullSystemPrompt}
+                            @input=${this.handleFullSystemPromptInput}
+                        ></textarea>
+                        <div class="form-description">
+                            ${
+                                this.fullSystemPrompt && this.fullSystemPrompt.trim()
+                                    ? html`<strong style="color: var(--accent-color, #3b82f6);">Active:</strong> Using direct prompt override above
+                                          for all AI queries.`
+                                    : html`<strong>Modular Mode:</strong> Using combined Profile + System Instruction + Meta + Context.`
+                            }
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 10px; display: flex; align-items: center;">
+                        <button class="primary-save-button" @click=${this.handleSaveAllInstructions}>
+                            <span>💾</span> Save Instructions & Prompts
+                        </button>
+                        ${this.saveFeedbackMessage ? html`<span class="save-feedback-badge">${this.saveFeedbackMessage}</span>` : ''}
                     </div>
                 </div>
             </div>
@@ -1450,9 +1781,7 @@ export class CustomizeView extends LitElement {
                         <option value="mic_only">Microphone Only (Me)</option>
                         <option value="both">Both Speaker & Microphone</option>
                     </select>
-                    <div class="form-description">
-                        Choose which audio sources to capture for the AI.
-                    </div>
+                    <div class="form-description">Choose which audio sources to capture for the AI.</div>
                 </div>
             </div>
         `;
@@ -1472,12 +1801,10 @@ export class CustomizeView extends LitElement {
                     </label>
                     <select class="form-control" .value=${this.selectedLanguage} @change=${this.handleLanguageSelect}>
                         ${languages.map(
-            language => html`
-                                <option value=${language.value} ?selected=${this.selectedLanguage === language.value}>
-                                    ${language.name}
-                                </option>
+                            language => html`
+                                <option value=${language.value} ?selected=${this.selectedLanguage === language.value}>${language.name}</option>
                             `
-        )}
+                        )}
                     </select>
                     <div class="form-description">Language for speech recognition and AI responses</div>
                 </div>
@@ -1498,17 +1825,9 @@ export class CustomizeView extends LitElement {
                         <span class="current-selection">${currentTheme?.name || 'Dark'}</span>
                     </label>
                     <select class="form-control" .value=${this.theme} @change=${this.handleThemeChange}>
-                        ${themes.map(
-            theme => html`
-                                <option value=${theme.value} ?selected=${this.theme === theme.value}>
-                                    ${theme.name}
-                                </option>
-                            `
-        )}
+                        ${themes.map(theme => html` <option value=${theme.value} ?selected=${this.theme === theme.value}>${theme.name}</option> `)}
                     </select>
-                    <div class="form-description">
-                        Choose a color theme for the interface
-                    </div>
+                    <div class="form-description">Choose a color theme for the interface</div>
                 </div>
 
                 <div class="form-group">
@@ -1521,10 +1840,7 @@ export class CustomizeView extends LitElement {
                         <option value="compact" ?selected=${this.layoutMode === 'compact'}>Compact</option>
                     </select>
                     <div class="form-description">
-                        ${this.layoutMode === 'compact'
-                ? 'Smaller window with reduced padding'
-                : 'Standard layout with comfortable spacing'
-            }
+                        ${this.layoutMode === 'compact' ? 'Smaller window with reduced padding' : 'Standard layout with comfortable spacing'}
                     </div>
                 </div>
 
@@ -1604,7 +1920,9 @@ export class CustomizeView extends LitElement {
                 <div class="form-group">
                     <label class="form-label">
                         Image Quality
-                        <span class="current-selection">${this.selectedImageQuality.charAt(0).toUpperCase() + this.selectedImageQuality.slice(1)}</span>
+                        <span class="current-selection"
+                            >${this.selectedImageQuality.charAt(0).toUpperCase() + this.selectedImageQuality.slice(1)}</span
+                        >
                     </label>
                     <select class="form-control" .value=${this.selectedImageQuality} @change=${this.handleImageQualitySelect}>
                         <option value="high" ?selected=${this.selectedImageQuality === 'high'}>High Quality</option>
@@ -1612,12 +1930,13 @@ export class CustomizeView extends LitElement {
                         <option value="low" ?selected=${this.selectedImageQuality === 'low'}>Low Quality</option>
                     </select>
                     <div class="form-description">
-                        ${this.selectedImageQuality === 'high'
-                ? 'Best quality, uses more tokens'
-                : this.selectedImageQuality === 'medium'
-                    ? 'Balanced quality and token usage'
-                    : 'Lower quality, uses fewer tokens'
-            }
+                        ${
+                            this.selectedImageQuality === 'high'
+                                ? 'Best quality, uses more tokens'
+                                : this.selectedImageQuality === 'medium'
+                                  ? 'Balanced quality and token usage'
+                                  : 'Lower quality, uses fewer tokens'
+                        }
                     </div>
                 </div>
             </div>
@@ -1626,13 +1945,15 @@ export class CustomizeView extends LitElement {
 
     renderKeyboardSection() {
         const allActions = this.getKeybindActions();
-        
+
         // Categorize shortcuts
         const mainActions = allActions.filter(a => a.category === 'main');
         const resizingActions = allActions.filter(a => a.category === 'resizing');
         const invigilatorActions = allActions.filter(a => a.category === 'invigilator');
-        const otherActions = allActions.filter(a => !a.category || (a.category !== 'main' && a.category !== 'resizing' && a.category !== 'invigilator'));
-        
+        const otherActions = allActions.filter(
+            a => !a.category || (a.category !== 'main' && a.category !== 'resizing' && a.category !== 'invigilator')
+        );
+
         const renderShortcutsTable = (actions, title) => html`
             <div class="shortcuts-section">
                 <h3>${title}</h3>
@@ -1645,77 +1966,81 @@ export class CustomizeView extends LitElement {
                     </thead>
                     <tbody>
                         ${actions.map(
-            action => html`
+                            action => html`
                                 <tr>
                                     <td>
                                         <div class="action-name">${action.name}</div>
                                         <div class="action-description">${action.description}</div>
                                     </td>
                                     <td>
-                                        ${action.fixed
-                    ? html`<span class="fixed-keybind">Ctrl+Alt+Enter</span>`
-                    : html`<input
-                                            type="text"
-                                            class="form-control keybind-input"
-                                            .value=${this.keybinds[action.key]}
-                                            placeholder="Press keys..."
-                                            data-action=${action.key}
-                                            @keydown=${this.handleKeybindInput}
-                                            @focus=${this.handleKeybindFocus}
-                                            readonly
-                                        />`
-                }
+                                        ${
+                                            action.fixed
+                                                ? html`<span class="fixed-keybind">Ctrl+Alt+Enter</span>`
+                                                : html`<input
+                                                      type="text"
+                                                      class="form-control keybind-input"
+                                                      .value=${this.keybinds[action.key]}
+                                                      placeholder="Press keys..."
+                                                      data-action=${action.key}
+                                                      @keydown=${this.handleKeybindInput}
+                                                      @focus=${this.handleKeybindFocus}
+                                                      readonly
+                                                  />`
+                                        }
                                     </td>
                                 </tr>
                             `
-        )}
+                        )}
                     </tbody>
                 </table>
             </div>
         `;
-        
+
         return html`
             <div class="content-header">Keyboard Shortcuts</div>
 
             <div class="form-grid" style="margin-bottom: 20px;">
                 <div class="form-group">
                     <label class="form-label" style="display: flex; align-items: center; gap: 8px;">
-                        <input type="checkbox" 
-                               .checked=${this.holdToTypeEnabled}
-                               @change=${this.handleHoldToTypeToggle} />
+                        <input type="checkbox" .checked=${this.holdToTypeEnabled} @change=${this.handleHoldToTypeToggle} />
                         Enable "Hold to Type" Mode
                     </label>
                     <div class="form-description">
-                        When enabled, Auto-Type will only type while you physically hold down the selected key below. Releasing the key instantly pauses typing.
+                        When enabled, Auto-Type will only type while you physically hold down the selected key below. Releasing the key instantly
+                        pauses typing.
                     </div>
                 </div>
-                ${this.holdToTypeEnabled ? html`
-                    <div class="form-group">
-                        <label class="form-label">Hold-to-Type Key</label>
-                        <select class="form-control" .value=${this.holdToTypeKey} @change=${this.handleHoldToTypeKeySelect}>
-                            <option value="0x11,0x10,VK:]">Ctrl + Shift + ]</option>
-                            <option value="VK:]">] (Right Bracket)</option>
-                            <option value="0x77">F8</option>
-                            <option value="0x78">F9</option>
-                            <option value="0x7B">F12</option>
-                        </select>
-                    </div>
-                ` : ''}
+                ${
+                    this.holdToTypeEnabled
+                        ? html`
+                              <div class="form-group">
+                                  <label class="form-label">Hold-to-Type Key</label>
+                                  <select class="form-control" .value=${this.holdToTypeKey} @change=${this.handleHoldToTypeKeySelect}>
+                                      <option value="0x11,0x10,VK:]">Ctrl + Shift + ]</option>
+                                      <option value="VK:]">] (Right Bracket)</option>
+                                      <option value="0x77">F8</option>
+                                      <option value="0x78">F9</option>
+                                      <option value="0x7B">F12</option>
+                                  </select>
+                              </div>
+                          `
+                        : ''
+                }
             </div>
 
             <div class="form-grid">
                 <!-- Main Shortcuts (Top) -->
                 ${mainActions.length > 0 ? renderShortcutsTable(mainActions, 'Main Shortcuts (Quick Controls)') : ''}
-                
+
                 <!-- Window Resizing -->
                 ${resizingActions.length > 0 ? renderShortcutsTable(resizingActions, 'Window Resizing') : ''}
-                
+
                 <!-- Invigilator Mode -->
                 ${invigilatorActions.length > 0 ? renderShortcutsTable(invigilatorActions, 'Invigilator Mode Shortcuts') : ''}
-                
+
                 <!-- Other Shortcuts (Bottom) -->
                 ${otherActions.length > 0 ? renderShortcutsTable(otherActions, 'Other Shortcuts') : ''}
-                
+
                 <div class="reset-section">
                     <button class="reset-keybinds-button" @click=${this.resetKeybinds}>Reset All to Defaults</button>
                 </div>
@@ -1759,42 +2084,49 @@ export class CustomizeView extends LitElement {
                         <option value="groq" ?selected=${this.aiProvider === 'groq'}>Groq (Llama)</option>
                     </select>
                     <div class="form-description">
-                        ${this.aiProvider === 'groq'
-                ? 'Groq uses Llama models with fast LPU inference. Note: Real-time audio NOT supported with Groq.'
-                : 'Gemini provides real-time audio streaming and screen analysis.'
-            }
+                        ${
+                            this.aiProvider === 'groq'
+                                ? 'Groq uses Llama models with fast LPU inference. Note: Real-time audio NOT supported with Groq.'
+                                : 'Gemini provides real-time audio streaming and screen analysis.'
+                        }
                     </div>
                 </div>
 
-                ${this.aiProvider === 'groq' ? html`
-                    <div class="form-group">
-                        <label class="form-label">Groq API Key</label>
-                        <input
-                            type="password"
-                            class="form-control"
-                            placeholder="Enter your Groq API key..."
-                            .value=${this.groqApiKey}
-                            @change=${this.handleGroqApiKeyChange}
-                        />
-                        <div class="form-description">
-                            Get your API key from <a href="https://console.groq.com" target="_blank" style="color: var(--text-color);">console.groq.com</a>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>OpenRouter API Key (for Reasoning)</label>
-                        <input 
-                            type="password"
-                            class="form-control"
-                            placeholder="Enter your OpenRouter API key..."
-                            .value=${this.openRouterApiKey}
-                            @change=${this.handleOpenRouterApiKeyChange}
-                        />
-                        <div class="form-description">
-                            Get your API key from <a href="https://openrouter.ai" target="_blank" style="color: var(--text-color);">openrouter.ai</a>
-                        </div>
-                    </div>
-                ` : ''}
+                ${
+                    this.aiProvider === 'groq'
+                        ? html`
+                              <div class="form-group">
+                                  <label class="form-label">Groq API Key</label>
+                                  <input
+                                      type="password"
+                                      class="form-control"
+                                      placeholder="Enter your Groq API key..."
+                                      .value=${this.groqApiKey}
+                                      @change=${this.handleGroqApiKeyChange}
+                                  />
+                                  <div class="form-description">
+                                      Get your API key from
+                                      <a href="https://console.groq.com" target="_blank" style="color: var(--text-color);">console.groq.com</a>
+                                  </div>
+                              </div>
+
+                              <div class="form-group">
+                                  <label>OpenRouter API Key (for Reasoning)</label>
+                                  <input
+                                      type="password"
+                                      class="form-control"
+                                      placeholder="Enter your OpenRouter API key..."
+                                      .value=${this.openRouterApiKey}
+                                      @change=${this.handleOpenRouterApiKeyChange}
+                                  />
+                                  <div class="form-description">
+                                      Get your API key from
+                                      <a href="https://openrouter.ai" target="_blank" style="color: var(--text-color);">openrouter.ai</a>
+                                  </div>
+                              </div>
+                          `
+                        : ''
+                }
             </div>
         `;
     }
@@ -1806,20 +2138,21 @@ export class CustomizeView extends LitElement {
                 <div class="form-group">
                     <label class="form-label" style="color: var(--error-color);">Data Management</label>
                     <div class="form-description" style="margin-bottom: 12px;">
-                        <strong>Warning:</strong> This action will permanently delete all local data including API keys, preferences, and session history. This cannot be undone.
+                        <strong>Warning:</strong> This action will permanently delete all local data including API keys, preferences, and session
+                        history. This cannot be undone.
                     </div>
-                    <button
-                        class="danger-button"
-                        @click=${this.clearLocalData}
-                        ?disabled=${this.isClearing}
-                    >
+                    <button class="danger-button" @click=${this.clearLocalData} ?disabled=${this.isClearing}>
                         ${this.isClearing ? 'Clearing...' : 'Clear All Local Data'}
                     </button>
-                    ${this.clearStatusMessage ? html`
-                        <div class="status-message ${this.clearStatusType === 'success' ? 'status-success' : 'status-error'}">
-                            ${this.clearStatusMessage}
-                        </div>
-                    ` : ''}
+                    ${
+                        this.clearStatusMessage
+                            ? html`
+                                  <div class="status-message ${this.clearStatusType === 'success' ? 'status-success' : 'status-error'}">
+                                      ${this.clearStatusMessage}
+                                  </div>
+                              `
+                            : ''
+                    }
                 </div>
             </div>
         `;
@@ -1857,7 +2190,7 @@ export class CustomizeView extends LitElement {
             <div class="settings-layout">
                 <nav class="settings-sidebar">
                     ${sections.map(
-            section => html`
+                        section => html`
                             <button
                                 class="sidebar-item ${this.activeSection === section.id ? 'active' : ''} ${section.danger ? 'danger' : ''}"
                                 @click=${() => this.setActiveSection(section.id)}
@@ -1866,15 +2199,12 @@ export class CustomizeView extends LitElement {
                                 <span>${section.name}</span>
                             </button>
                         `
-        )}
+                    )}
                 </nav>
-                <div class="settings-content">
-                    ${this.renderSectionContent()}
-                </div>
+                <div class="settings-content">${this.renderSectionContent()}</div>
             </div>
         `;
     }
 }
 
 customElements.define('customize-view', CustomizeView);
-

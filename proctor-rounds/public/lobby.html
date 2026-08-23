@@ -1,111 +1,105 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Proctor Rounds — Create or join a live-proctored coding assessment session." />
-    <title>Proctor Rounds — Session Lobby</title>
-    <link rel="stylesheet" href="/css/styles.css" />
-</head>
-<body>
-    <div class="lobby-container">
-        <div class="lobby-hero">
-            <h1>Proctor Rounds</h1>
-            <p>Live coding integrity monitor. Create a session or join an existing one to get started.</p>
-        </div>
-
-        <!-- Create Session Card -->
-        <div class="lobby-card glass-panel" id="create-card">
-            <h2>🚀 Create New Session</h2>
-
-            <div class="form-group">
-                <label for="candidateName">Candidate Name</label>
-                <input type="text" id="candidateName" class="input-field" placeholder="e.g. Jane Doe" />
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="Proctor Rounds — Create or join a live-proctored coding assessment session." />
+        <title>Proctor Rounds — Session Lobby</title>
+        <link rel="stylesheet" href="/css/styles.css" />
+    </head>
+    <body>
+        <div class="lobby-container">
+            <div class="lobby-hero">
+                <h1>Proctor Rounds</h1>
+                <p>Live coding integrity monitor. Create a session or join an existing one to get started.</p>
             </div>
 
-            <div class="form-group">
-                <label for="proctorName">Proctor Name</label>
-                <input type="text" id="proctorName" class="input-field" placeholder="e.g. Interviewer" />
-            </div>
+            <!-- Create Session Card -->
+            <div class="lobby-card glass-panel" id="create-card">
+                <h2>🚀 Create New Session</h2>
 
-            <div class="form-group">
-                <label for="language">Default Language</label>
-                <select id="language" class="select-field">
-                    <option value="javascript">JavaScript</option>
-                    <option value="python">Python</option>
-                    <option value="java">Java</option>
-                    <option value="cpp">C++</option>
-                    <option value="go">Go</option>
-                    <option value="rust">Rust</option>
-                    <option value="typescript">TypeScript</option>
-                </select>
-            </div>
-
-            <button id="createSessionBtn" class="btn btn-primary" style="width: 100%;">
-                Create Session
-            </button>
-
-            <!-- Session Links (shown after creation) -->
-            <div class="session-links" id="sessionLinks">
-                <h3 style="font-size: 0.85rem; font-weight: 600; margin-bottom: 16px; color: var(--text-primary);">
-                    ✅ Session Created
-                </h3>
-
-                <div class="link-row">
-                    <label>Candidate</label>
-                    <input type="text" id="candidateLink" readonly />
-                    <button class="btn-copy" data-target="candidateLink">Copy</button>
+                <div class="form-group">
+                    <label for="candidateName">Candidate Name</label>
+                    <input type="text" id="candidateName" class="input-field" placeholder="e.g. Jane Doe" />
                 </div>
 
-                <div class="link-row">
-                    <label>Proctor</label>
-                    <input type="text" id="proctorLink" readonly />
-                    <button class="btn-copy" data-target="proctorLink">Copy</button>
+                <div class="form-group">
+                    <label for="proctorName">Proctor Name</label>
+                    <input type="text" id="proctorName" class="input-field" placeholder="e.g. Interviewer" />
                 </div>
 
-                <div style="margin-top: 16px; display: flex; gap: 10px;">
-                    <a id="openCandidateBtn" href="#" target="_blank" class="btn btn-secondary btn-sm" style="flex:1; text-align:center;">
-                        Open Candidate View
-                    </a>
-                    <a id="openProctorBtn" href="#" target="_blank" class="btn btn-primary btn-sm" style="flex:1; text-align:center;">
-                        Open Proctor Dashboard
-                    </a>
+                <div class="form-group">
+                    <label for="language">Default Language</label>
+                    <select id="language" class="select-field">
+                        <option value="javascript">JavaScript</option>
+                        <option value="python">Python</option>
+                        <option value="java">Java</option>
+                        <option value="cpp">C++</option>
+                        <option value="go">Go</option>
+                        <option value="rust">Rust</option>
+                        <option value="typescript">TypeScript</option>
+                    </select>
                 </div>
+
+                <button id="createSessionBtn" class="btn btn-primary" style="width: 100%">Create Session</button>
+
+                <!-- Session Links (shown after creation) -->
+                <div class="session-links" id="sessionLinks">
+                    <h3 style="font-size: 0.85rem; font-weight: 600; margin-bottom: 16px; color: var(--text-primary)">✅ Session Created</h3>
+
+                    <div class="link-row">
+                        <label>Candidate</label>
+                        <input type="text" id="candidateLink" readonly />
+                        <button class="btn-copy" data-target="candidateLink">Copy</button>
+                    </div>
+
+                    <div class="link-row">
+                        <label>Proctor</label>
+                        <input type="text" id="proctorLink" readonly />
+                        <button class="btn-copy" data-target="proctorLink">Copy</button>
+                    </div>
+
+                    <div style="margin-top: 16px; display: flex; gap: 10px">
+                        <a id="openCandidateBtn" href="#" target="_blank" class="btn btn-secondary btn-sm" style="flex: 1; text-align: center">
+                            Open Candidate View
+                        </a>
+                        <a id="openProctorBtn" href="#" target="_blank" class="btn btn-primary btn-sm" style="flex: 1; text-align: center">
+                            Open Proctor Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lobby-divider">or join existing</div>
+
+            <!-- Join Session Card -->
+            <div class="lobby-card glass-panel" id="join-card">
+                <h2>🔗 Join Session</h2>
+
+                <div class="form-group">
+                    <label for="sessionCode">Session Code</label>
+                    <input type="text" id="sessionCode" class="input-field" placeholder="Enter 8-character session code" />
+                </div>
+
+                <div class="form-group">
+                    <label for="joinToken">Access Token</label>
+                    <input type="text" id="joinToken" class="input-field" placeholder="Paste your candidate or proctor token" />
+                </div>
+
+                <div class="form-group">
+                    <label for="joinRole">Role</label>
+                    <select id="joinRole" class="select-field">
+                        <option value="candidate">Candidate</option>
+                        <option value="proctor">Proctor</option>
+                    </select>
+                </div>
+
+                <button id="joinSessionBtn" class="btn btn-secondary" style="width: 100%">Join Session</button>
+
+                <p id="joinError" style="color: var(--severity-alert); font-size: 0.82rem; margin-top: 12px; display: none"></p>
             </div>
         </div>
 
-        <div class="lobby-divider">or join existing</div>
-
-        <!-- Join Session Card -->
-        <div class="lobby-card glass-panel" id="join-card">
-            <h2>🔗 Join Session</h2>
-
-            <div class="form-group">
-                <label for="sessionCode">Session Code</label>
-                <input type="text" id="sessionCode" class="input-field" placeholder="Enter 8-character session code" />
-            </div>
-
-            <div class="form-group">
-                <label for="joinToken">Access Token</label>
-                <input type="text" id="joinToken" class="input-field" placeholder="Paste your candidate or proctor token" />
-            </div>
-
-            <div class="form-group">
-                <label for="joinRole">Role</label>
-                <select id="joinRole" class="select-field">
-                    <option value="candidate">Candidate</option>
-                    <option value="proctor">Proctor</option>
-                </select>
-            </div>
-
-            <button id="joinSessionBtn" class="btn btn-secondary" style="width: 100%;">
-                Join Session
-            </button>
-
-            <p id="joinError" style="color: var(--severity-alert); font-size: 0.82rem; margin-top: 12px; display: none;"></p>
-        </div>
-    </div>
-
-    <script src="/js/lobby.js"></script>
-</body>
+        <script src="/js/lobby.js"></script>
+    </body>
 </html>

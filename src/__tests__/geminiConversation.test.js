@@ -4,7 +4,7 @@ require.cache[electronPath] = {
         BrowserWindow: {
             getAllWindows: vi.fn(() => [{ webContents: { send: vi.fn() } }]),
         },
-        ipcMain: { handle: vi.fn(), on: vi.fn() },
+        ipcMain: { handle: vi.fn(), on: vi.fn(), emit: vi.fn() },
         shell: { openExternal: vi.fn() },
     },
 };

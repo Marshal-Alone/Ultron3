@@ -3,6 +3,7 @@
 ## Overview
 
 **Invigilator Mode** is a stealth exam feature that enables users to:
+
 - Capture coding questions from exam platforms
 - Get AI-generated answers with visual preview (styled like IDE code)
 - Auto-type answers into exam input fields with configurable typing speed
@@ -17,9 +18,11 @@ The feature is designed for scenarios where an invigilator (exam proctor) is phy
 ### Components
 
 #### 1. **Auto-Type Engine** (`src/utils/autotype.js`)
+
 The core keyboard simulation system that types code into exam fields.
 
 **Functions:**
+
 - `createAutotyper(keyboard)` — Creates an auto-typer instance
 - `typeCharByChar(text, options)` — Type character-by-character with randomized delays
 - `typeInstant(text)` — Type entire text instantly
@@ -28,31 +31,35 @@ The core keyboard simulation system that types code into exam fields.
 
 **Typing Modes:**
 
-| Mode | Speed | Behavior | Use Case |
-|------|-------|----------|----------|
+| Mode                       | Speed        | Behavior                                                                 | Use Case                                                                                   |
+| -------------------------- | ------------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
 | **Char-by-Char** (Default) | ~100-150 WPM | Types one character at a time with 40-80ms delays between each keystroke | Looks natural, appears like fast manual typing. Safer when invigilator is watching closely |
-| **Instant** | ~1ms delay | All code appears at once in the field | Fast but more obvious to observers. Use only when invigilator is away |
+| **Instant**                | ~1ms delay   | All code appears at once in the field                                    | Fast but more obvious to observers. Use only when invigilator is away                      |
 
 **Implementation Details:**
+
 - Uses Electron's keyboard simulation APIs
 - Fallback: robotjs library if available, otherwise clipboard + keyboard emulation
 - Randomized inter-keystroke delays to mimic natural human typing speed
 - Handles special characters (`;`, `{}`, `()`, etc.) correctly
 
 #### 2. **Invigilator Mode State Manager** (`src/utils/invigilatorMode.js`)
+
 Manages the mode state, typing preferences, and event callbacks.
 
 **Class: `InvigilatorModeManager`**
 
 **Properties:**
+
 ```javascript
-isActive: boolean              // Is invigilator mode activated?
-typingMode: string            // 'charByChar' or 'instant'
-previewWindowVisible: boolean  // Is answer preview showing?
-lastAnswerCode: string         // Most recent answer code
+isActive: boolean; // Is invigilator mode activated?
+typingMode: string; // 'charByChar' or 'instant'
+previewWindowVisible: boolean; // Is answer preview showing?
+lastAnswerCode: string; // Most recent answer code
 ```
 
 **Key Methods:**
+
 - `toggleMode()` — Enter/exit invigilator mode
 - `setTypingMode(mode)` — Set typing speed ('charByChar' or 'instant')
 - `toggleTypingMode()` — Toggle between modes
@@ -63,25 +70,28 @@ lastAnswerCode: string         // Most recent answer code
 - `getState()` — Get complete state snapshot
 
 **Example Usage:**
+
 ```javascript
 import { invigilatorMode } from './src/utils/invigilatorMode.js';
 
 // Toggle mode on/off
-invigilatorMode.toggleMode();  // true if enabled
+invigilatorMode.toggleMode(); // true if enabled
 
 // Change typing speed
-invigilatorMode.setTypingMode('instant');  // instant mode
+invigilatorMode.setTypingMode('instant'); // instant mode
 
 // Subscribe to changes
 invigilatorMode.onModeToggle(({ isActive }) => {
-  console.log(`Invigilator mode: ${isActive}`);
+    console.log(`Invigilator mode: ${isActive}`);
 });
 ```
 
 #### 3. **Answer Preview Component** (TODO: `src/components/views/InvigilatorPreviewView.js`)
+
 A Lit web component that displays code answers styled like IDE output.
 
 **Styling:**
+
 - Syntax highlighting (Java, Python, C++, etc.)
 - Line numbers on the left
 - Monospace font (matches TopBrains editor)
@@ -89,6 +99,7 @@ A Lit web component that displays code answers styled like IDE output.
 - Full opacity (user can manually adjust)
 
 **Behavior:**
+
 - Shows when answer is retrieved (`Ctrl+Alt+A`)
 - User reviews for 2-3 seconds
 - User confirms with `Ctrl+Alt+Space` to begin auto-typing
@@ -100,20 +111,22 @@ A Lit web component that displays code answers styled like IDE output.
 
 ### New Invigilator Mode Hotkeys
 
-| Hotkey | Action | Default | Mac Alternative |
-|--------|--------|---------|-----------------|
-| `Ctrl+Alt+M` | Toggle invigilator mode ON/OFF | Windows | `Cmd+Alt+M` |
-| `Ctrl+Alt+A` | Capture question & show answer preview | Windows | `Cmd+Alt+A` |
-| `Ctrl+Alt+Space` | Confirm & start auto-typing | Windows | `Cmd+Alt+Space` |
-| `Ctrl+Shift+T` | Toggle typing mode (Char-by-Char ↔ Instant) | Windows | `Cmd+Shift+T` |
+| Hotkey           | Action                                      | Default | Mac Alternative |
+| ---------------- | ------------------------------------------- | ------- | --------------- |
+| `Ctrl+Alt+M`     | Toggle invigilator mode ON/OFF              | Windows | `Cmd+Alt+M`     |
+| `Ctrl+Alt+A`     | Capture question & show answer preview      | Windows | `Cmd+Alt+A`     |
+| `Ctrl+Alt+Space` | Confirm & start auto-typing                 | Windows | `Cmd+Alt+Space` |
+| `Ctrl+Shift+T`   | Toggle typing mode (Char-by-Char ↔ Instant) | Windows | `Cmd+Shift+T`   |
 
 ### Existing Hotkeys (Still Available)
+
 - `Ctrl+\` — Manual show/hide window (works in any mode)
 - `Ctrl+Alt+Enter` — Toggle AI provider (unchanged)
 
 ### Hotkey Rationale
 
 **Why these specific keys?**
+
 - ✅ `Ctrl+Alt+M` — Safe (not a common browser/OS shortcut)
 - ✅ `Ctrl+Alt+A` — Safe (exam platforms typically don't use this)
 - ✅ `Ctrl+Alt+Space` — Safe (unique and unlikely to conflict)
@@ -168,56 +181,64 @@ A Lit web component that displays code answers styled like IDE output.
 ### Character-by-Character Mode (Default)
 
 **How it works:**
+
 1. Take answer code: `int x = 5;`
 2. Type each character with randomized delay:
-   - `i` → wait 60ms
-   - `n` → wait 45ms
-   - `t` → wait 70ms
-   - ` ` → wait 55ms
-   - ... continue for all characters
+    - `i` → wait 60ms
+    - `n` → wait 45ms
+    - `t` → wait 70ms
+    - ` ` → wait 55ms
+    - ... continue for all characters
 
 **Timing:**
+
 - Minimum delay: 40ms
 - Maximum delay: 80ms
 - Average WPM: ~100-150 (human-like typing speed)
 
 **Why it's effective:**
+
 - ✅ Looks like the user is actively typing
 - ✅ Invigilator sees code appearing naturally
 - ✅ No obvious "paste" behavior pattern
 - ✅ Takes ~2-5 seconds for medium code, appears realistic
 
 **Code Reference:**
+
 ```javascript
 // From src/utils/autotype.js
 async function typeCharByChar(text, options = {}) {
-  const { minDelay = 40, maxDelay = 80 } = options;
-  
-  for (const char of text) {
-    await keyboard.sendKey(char);
-    const delay = Math.random() * (maxDelay - minDelay) + minDelay;
-    await new Promise(resolve => setTimeout(resolve, delay));
-  }
+    const { minDelay = 40, maxDelay = 80 } = options;
+
+    for (const char of text) {
+        await keyboard.sendKey(char);
+        const delay = Math.random() * (maxDelay - minDelay) + minDelay;
+        await new Promise(resolve => setTimeout(resolve, delay));
+    }
 }
 ```
 
 ### Instant Mode
 
 **How it works:**
+
 1. All characters sent as fast as possible (1ms delay between each)
 2. Code appears completely in field within 100-200ms
 3. User then appears to be reviewing/editing the code
 
 **Pros:**
+
 - ✅ Fastest method
 - ✅ Gets answer in field immediately
 - ✅ Can quickly hide window
 
 **Cons:**
+
 - ❌ Obvious if invigilator is watching
 - ❌ No human mimicry
 
 **When to use:**
+
 - Invigilator is distracted or far away
 - Under extreme time pressure
 - Question is very short
@@ -353,11 +374,13 @@ docs/
 ## Implementation Status
 
 ### ✅ COMPLETED
+
 - [x] Task 1: Auto-Type Engine (`src/utils/autotype.js`) — 3 passing unit tests
 - [x] Task 2: Invigilator Mode State Manager (`src/utils/invigilatorMode.js`) — 6 passing unit tests
 - [x] Hotkey definitions added (pending registration handlers)
 
 ### 🔄 IN PROGRESS
+
 - [ ] Task 4: Register hotkey handlers in `window.js` with console logging
 - [ ] Task 3: Answer Preview Component (`InvigilatorPreviewView.js`)
 - [ ] Task 5: Integrate into main app component
@@ -369,6 +392,7 @@ docs/
 - [ ] Task 11: Final documentation
 
 ### 📋 TODO
+
 - Add console logging to show which hotkeys are detected
 - Register all 4 invigilator mode hotkeys with handlers
 - Create answer preview component
@@ -402,12 +426,14 @@ Registered toggleInvigilatorMode: Ctrl+Alt+M
 ### Unit Tests (Passing ✅)
 
 **Auto-Type Tests:**
+
 ```bash
 npm test -- src/__tests__/autotype.test.js
 # Expected: 3 passed
 ```
 
 **State Manager Tests:**
+
 ```bash
 npm test -- src/__tests__/invigilatorMode.test.js
 # Expected: 6 passed
@@ -416,6 +442,7 @@ npm test -- src/__tests__/invigilatorMode.test.js
 ### Manual Testing Checklist
 
 Once full implementation completes:
+
 - [ ] Press `Ctrl+Alt+M` — App enters invigilator mode and hides
 - [ ] Press `Ctrl+Alt+A` — Answer preview appears with code
 - [ ] Press `Ctrl+Alt+Space` — Code auto-types into exam field (char-by-char)
@@ -433,39 +460,42 @@ Once full implementation completes:
 ### Potential Issues
 
 1. **Hotkey Conflicts**
-   - Chrome: `Ctrl+Shift+A` opens DevTools (why we avoid it)
-   - Some exam platforms may capture certain keys
-   - **Solution:** Custom hotkey configuration in settings
+    - Chrome: `Ctrl+Shift+A` opens DevTools (why we avoid it)
+    - Some exam platforms may capture certain keys
+    - **Solution:** Custom hotkey configuration in settings
 
 2. **Auto-Type Failures**
-   - Exam platform input field not in focus
-   - Keyboard simulation blocked by OS security
-   - **Solution:** Fallback to clipboard-paste hybrid approach
+    - Exam platform input field not in focus
+    - Keyboard simulation blocked by OS security
+    - **Solution:** Fallback to clipboard-paste hybrid approach
 
 3. **Detection Risk**
-   - Instant mode is obvious to observers
-   - Char-by-char mode visible if invigilator watches close
-   - **Solution:** Use char-by-char mode when being observed
+    - Instant mode is obvious to observers
+    - Char-by-char mode visible if invigilator watches close
+    - **Solution:** Use char-by-char mode when being observed
 
 4. **Special Characters**
-   - Braces, brackets, special symbols may not type correctly
-   - **Solution:** Use clipboard for complex code blocks
+    - Braces, brackets, special symbols may not type correctly
+    - **Solution:** Use clipboard for complex code blocks
 
 ---
 
 ## Security & Ethical Considerations
 
 ### Intended Use
+
 - Personal learning during exams (with permission)
 - Accessibility support for students with disabilities
 - Quick reference assistance
 
 ### Do NOT Use For
+
 - Academic dishonesty without consent
 - Exam fraud
 - Violating exam rules
 
 ### Built-in Protections
+
 - ✅ Fully local processing (no data sent to external servers except AI API)
 - ✅ Auto-hide feature minimizes visual detection
 - ✅ Works offline (except AI calls)
@@ -477,16 +507,19 @@ Once full implementation completes:
 ## Keyboard Compatibility
 
 ### Linux/Windows
+
 - Uses standard Ctrl+Alt+Shift combinations
 - Fallback: robotjs library for keyboard emulation
 - Tested: Windows 10, Windows 11
 
 ### macOS
+
 - Uses Cmd+Alt+Shift combinations
 - Supported through Electron's ipcRenderer
 - Tested: macOS 11, macOS 12+
 
 ### Browser Limitations
+
 - **Works in Electron app only** (not in web browser)
 - Exam platforms run in embedded Electron window
 - Global hotkeys work across entire OS
@@ -495,11 +528,11 @@ Once full implementation completes:
 
 ## Version History
 
-| Version | Date | Changes |
-|---------|------|---------|
-| 0.1.0 | 2026-04-02 | Initial implementation plan, auto-type engine, state manager |
-| TBD | TBD | Answer preview component |
-| TBD | TBD | Full integration & testing |
+| Version | Date       | Changes                                                      |
+| ------- | ---------- | ------------------------------------------------------------ |
+| 0.1.0   | 2026-04-02 | Initial implementation plan, auto-type engine, state manager |
+| TBD     | TBD        | Answer preview component                                     |
+| TBD     | TBD        | Full integration & testing                                   |
 
 ---
 

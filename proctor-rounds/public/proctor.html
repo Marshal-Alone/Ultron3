@@ -1,118 +1,108 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Proctor Rounds — Real-time proctor monitoring dashboard." />
-    <title>Proctor Rounds — Proctor Dashboard</title>
-    <link rel="stylesheet" href="/css/styles.css" />
-    <script type="module" src="/js/proctor.js"></script>
-</head>
-<body>
-    <div class="proctor-layout">
-        <!-- Header -->
-        <div class="proctor-header">
-            <div class="proctor-header-left">
-                <h1>🛡️ Proctor Dashboard</h1>
-                <span class="badge badge-live" id="statusBadge">
-                    <span class="live-dot"></span> MONITORING
-                </span>
-            </div>
-            <div class="proctor-header-right">
-                <div class="timer-display" id="proctorTimer">00:00:00</div>
-                <button class="btn btn-danger btn-sm" id="endSessionBtn">End Session</button>
-            </div>
-        </div>
-
-        <!-- Body: Editor + Sidebar -->
-        <div class="proctor-body">
-            <!-- Left: Editor Mirror -->
-            <div class="proctor-editor-panel">
-                <div class="panel-header">
-                    <h3>📝 Candidate's Editor (Live Mirror)</h3>
-                    <span class="badge badge-info" id="editorLangBadge">JavaScript</span>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="Proctor Rounds — Real-time proctor monitoring dashboard." />
+        <title>Proctor Rounds — Proctor Dashboard</title>
+        <link rel="stylesheet" href="/css/styles.css" />
+        <script type="module" src="/js/proctor.js"></script>
+    </head>
+    <body>
+        <div class="proctor-layout">
+            <!-- Header -->
+            <div class="proctor-header">
+                <div class="proctor-header-left">
+                    <h1>🛡️ Proctor Dashboard</h1>
+                    <span class="badge badge-live" id="statusBadge"> <span class="live-dot"></span> MONITORING </span>
                 </div>
-                <div class="proctor-editor-area" id="proctorEditorContainer">
-                    <div class="empty-state" id="editorEmpty">
-                        <div class="empty-icon">⌨️</div>
-                        <p>Waiting for candidate to start coding…</p>
-                    </div>
+                <div class="proctor-header-right">
+                    <div class="timer-display" id="proctorTimer">00:00:00</div>
+                    <button class="btn btn-danger btn-sm" id="endSessionBtn">End Session</button>
                 </div>
             </div>
 
-            <!-- Right: Sidebar -->
-            <div class="proctor-sidebar">
-                <!-- Session Metadata -->
-                <div class="session-meta">
-                    <div class="meta-grid">
-                        <div class="meta-item">
-                            <span class="meta-label">Candidate</span>
-                            <span class="meta-value" id="metaCandidate">—</span>
-                        </div>
-                        <div class="meta-item">
-                            <span class="meta-label">Session ID</span>
-                            <span class="meta-value mono" id="metaSessionId">—</span>
-                        </div>
-                        <div class="meta-item">
-                            <span class="meta-label">Started</span>
-                            <span class="meta-value" id="metaStarted">—</span>
-                        </div>
-                        <div class="meta-item">
-                            <span class="meta-label">Status</span>
-                            <span class="meta-value" id="metaStatus">Waiting</span>
+            <!-- Body: Editor + Sidebar -->
+            <div class="proctor-body">
+                <!-- Left: Editor Mirror -->
+                <div class="proctor-editor-panel">
+                    <div class="panel-header">
+                        <h3>📝 Candidate's Editor (Live Mirror)</h3>
+                        <span class="badge badge-info" id="editorLangBadge">JavaScript</span>
+                    </div>
+                    <div class="proctor-editor-area" id="proctorEditorContainer">
+                        <div class="empty-state" id="editorEmpty">
+                            <div class="empty-icon">⌨️</div>
+                            <p>Waiting for candidate to start coding…</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Running Counters -->
-                <div class="counters-bar" id="countersBar">
-                    <div class="counter-chip" data-counter="tab_switch">
-                        🔀 Tab Switches <span class="counter-num" id="counterTabs">0</span>
+                <!-- Right: Sidebar -->
+                <div class="proctor-sidebar">
+                    <!-- Session Metadata -->
+                    <div class="session-meta">
+                        <div class="meta-grid">
+                            <div class="meta-item">
+                                <span class="meta-label">Candidate</span>
+                                <span class="meta-value" id="metaCandidate">—</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Session ID</span>
+                                <span class="meta-value mono" id="metaSessionId">—</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Started</span>
+                                <span class="meta-value" id="metaStarted">—</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Status</span>
+                                <span class="meta-value" id="metaStatus">Waiting</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="counter-chip" data-counter="paste">
-                        📋 Pastes <span class="counter-num" id="counterPastes">0</span>
-                    </div>
-                    <div class="counter-chip" data-counter="focus_loss">
-                        👁️ Focus Lost <span class="counter-num" id="counterFocus">0</span>
-                    </div>
-                    <div class="counter-chip" data-counter="devtools">
-                        🔧 DevTools <span class="counter-num" id="counterDevtools">0</span>
-                    </div>
-                    <div class="counter-chip" data-counter="disconnect">
-                        📡 Disconnects <span class="counter-num" id="counterDisconnects">0</span>
-                    </div>
-                </div>
 
-                <!-- Filter Bar -->
-                <div class="filter-bar" id="filterBar">
-                    <button class="filter-btn active" data-filter="all">All</button>
-                    <button class="filter-btn" data-filter="alert">🔴 Alerts</button>
-                    <button class="filter-btn" data-filter="warning">🟡 Warnings</button>
-                    <button class="filter-btn" data-filter="info">🔵 Info</button>
-                </div>
+                    <!-- Running Counters -->
+                    <div class="counters-bar" id="countersBar">
+                        <div class="counter-chip" data-counter="tab_switch">🔀 Tab Switches <span class="counter-num" id="counterTabs">0</span></div>
+                        <div class="counter-chip" data-counter="paste">📋 Pastes <span class="counter-num" id="counterPastes">0</span></div>
+                        <div class="counter-chip" data-counter="focus_loss">👁️ Focus Lost <span class="counter-num" id="counterFocus">0</span></div>
+                        <div class="counter-chip" data-counter="devtools">🔧 DevTools <span class="counter-num" id="counterDevtools">0</span></div>
+                        <div class="counter-chip" data-counter="disconnect">
+                            📡 Disconnects <span class="counter-num" id="counterDisconnects">0</span>
+                        </div>
+                    </div>
 
-                <!-- Event Feed -->
-                <div class="event-feed" id="eventFeed">
-                    <div class="empty-state" id="feedEmpty">
-                        <div class="empty-icon">📋</div>
-                        <p>No events yet. Activity will appear here in real time.</p>
+                    <!-- Filter Bar -->
+                    <div class="filter-bar" id="filterBar">
+                        <button class="filter-btn active" data-filter="all">All</button>
+                        <button class="filter-btn" data-filter="alert">🔴 Alerts</button>
+                        <button class="filter-btn" data-filter="warning">🟡 Warnings</button>
+                        <button class="filter-btn" data-filter="info">🔵 Info</button>
+                    </div>
+
+                    <!-- Event Feed -->
+                    <div class="event-feed" id="eventFeed">
+                        <div class="empty-state" id="feedEmpty">
+                            <div class="empty-icon">📋</div>
+                            <p>No events yet. Activity will appear here in real time.</p>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Toast Container -->
-    <div class="toast-container" id="toastContainer"></div>
+        <!-- Toast Container -->
+        <div class="toast-container" id="toastContainer"></div>
 
-    <!-- Disconnected Overlay -->
-    <div class="disconnected-overlay" id="disconnectedOverlay">
-        <div class="disconnected-box">
-            <div class="disc-icon">📡</div>
-            <h2>Connection Lost</h2>
-            <p>Attempting to reconnect to session…</p>
-            <div class="spinner"></div>
+        <!-- Disconnected Overlay -->
+        <div class="disconnected-overlay" id="disconnectedOverlay">
+            <div class="disconnected-box">
+                <div class="disc-icon">📡</div>
+                <h2>Connection Lost</h2>
+                <p>Attempting to reconnect to session…</p>
+                <div class="spinner"></div>
+            </div>
         </div>
-    </div>
-</body>
+    </body>
 </html>

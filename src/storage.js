@@ -8,38 +8,41 @@ const CONFIG_VERSION = 1;
 const DEFAULT_CONFIG = {
     configVersion: CONFIG_VERSION,
     onboarded: false,
-    layout: 'normal'
+    layout: 'normal',
 };
 
 const DEFAULT_CREDENTIALS = {
     apiKey: '',
     groqApiKey: '',
-    openRouterApiKey: ''
+    openRouterApiKey: '',
 };
 
 const DEFAULT_PREFERENCES = {
     customPrompt: '',
+    systemInstruction: '', // Custom system instruction override
+    developerInstruction: '', // Developer / Meta reasoning instruction
+    fullSystemPrompt: '', // Full system prompt override (if set, overrides entire prompt)
     selectedProfile: 'interview',
     selectedLanguage: 'en-US',
     selectedScreenshotInterval: '5',
     selectedImageQuality: 'medium',
     advancedMode: false,
-    audioMode: 'speaker_only',
+    audioMode: 'both',
     fontSize: 16,
     backgroundTransparency: 0.8,
     googleSearchEnabled: false,
-    aiProvider: 'gemini',  // 'gemini' or 'groq'
+    aiProvider: 'gemini', // 'gemini' or 'groq'
     // Invigilator Mode preferences
-    invigilatorTypingMode: 'charByChar',  // 'charByChar' or 'instant'
-    invigilatorModeEnabled: false,  // Default to disabled
+    invigilatorTypingMode: 'charByChar', // 'charByChar' or 'instant'
+    invigilatorModeEnabled: false, // Default to disabled
     holdToTypeEnabled: false,
-    holdToTypeKey: '0x11,0x10,VK:]' // Default to Ctrl+Shift+]
+    holdToTypeKey: '0x11,0x10,VK:]', // Default to Ctrl+Shift+]
 };
 
 const DEFAULT_KEYBINDS = null; // null means use system defaults
 
 const DEFAULT_LIMITS = {
-    data: [] // Array of { date: 'YYYY-MM-DD', flash: { count: 0 }, flashLite: { count: 0 } }
+    data: [], // Array of { date: 'YYYY-MM-DD', flash: { count: 0 }, flashLite: { count: 0 } }
 };
 
 // Get the config directory path based on OS
@@ -233,6 +236,30 @@ function updatePreference(key, value) {
     return writeJsonFile(getPreferencesPath(), preferences);
 }
 
+function getSystemInstruction() {
+    return getPreferences().systemInstruction || '';
+}
+
+function setSystemInstruction(instruction) {
+    return updatePreference('systemInstruction', instruction);
+}
+
+function getDeveloperInstruction() {
+    return getPreferences().developerInstruction || '';
+}
+
+function setDeveloperInstruction(instruction) {
+    return updatePreference('developerInstruction', instruction);
+}
+
+function getFullSystemPrompt() {
+    return getPreferences().fullSystemPrompt || '';
+}
+
+function setFullSystemPrompt(prompt) {
+    return updatePreference('fullSystemPrompt', prompt);
+}
+
 // ============ KEYBINDS ============
 
 function getKeybinds() {
@@ -274,7 +301,7 @@ function getTodayLimits() {
     const newEntry = {
         date: today,
         flash: { count: 0 },
-        flashLite: { count: 0 }
+        flashLite: { count: 0 },
     };
     limits.data.push(newEntry);
     setLimits(limits);
@@ -295,7 +322,7 @@ function incrementLimitCount(model) {
         todayEntry = {
             date: today,
             flash: { count: 0 },
-            flashLite: { count: 0 }
+            flashLite: { count: 0 },
         };
         limits.data.push(todayEntry);
     } else {
@@ -349,7 +376,7 @@ function saveSession(sessionId, data) {
         customPrompt: data.customPrompt || existingSession?.customPrompt || null,
         // Conversation data
         conversationHistory: data.conversationHistory || existingSession?.conversationHistory || [],
-        screenAnalysisHistory: data.screenAnalysisHistory || existingSession?.screenAnalysisHistory || []
+        screenAnalysisHistory: data.screenAnalysisHistory || existingSession?.screenAnalysisHistory || [],
     };
     return writeJsonFile(sessionPath, sessionData);
 }
@@ -366,7 +393,8 @@ function getAllSessions() {
             return [];
         }
 
-        const files = fs.readdirSync(historyDir)
+        const files = fs
+            .readdirSync(historyDir)
             .filter(f => f.endsWith('.json'))
             .sort((a, b) => {
                 // Sort by timestamp descending (newest first)
@@ -375,22 +403,24 @@ function getAllSessions() {
                 return tsB - tsA;
             });
 
-        return files.map(file => {
-            const sessionId = file.replace('.json', '');
-            const data = readJsonFile(path.join(historyDir, file), null);
-            if (data) {
-                return {
-                    sessionId,
-                    createdAt: data.createdAt,
-                    lastUpdated: data.lastUpdated,
-                    messageCount: data.conversationHistory?.length || 0,
-                    screenAnalysisCount: data.screenAnalysisHistory?.length || 0,
-                    profile: data.profile || null,
-                    customPrompt: data.customPrompt || null
-                };
-            }
-            return null;
-        }).filter(Boolean);
+        return files
+            .map(file => {
+                const sessionId = file.replace('.json', '');
+                const data = readJsonFile(path.join(historyDir, file), null);
+                if (data) {
+                    return {
+                        sessionId,
+                        createdAt: data.createdAt,
+                        lastUpdated: data.lastUpdated,
+                        messageCount: data.conversationHistory?.length || 0,
+                        screenAnalysisCount: data.screenAnalysisHistory?.length || 0,
+                        profile: data.profile || null,
+                        customPrompt: data.customPrompt || null,
+                    };
+                }
+                return null;
+            })
+            .filter(Boolean);
     } catch (error) {
         console.error('Error reading sessions:', error.message);
         return [];
@@ -434,7 +464,7 @@ function getWindowBounds() {
         width: prefs.windowWidth || 509,
         height: prefs.windowHeight || 352,
         x: prefs.windowX !== undefined ? prefs.windowX : undefined,
-        y: prefs.windowY !== undefined ? prefs.windowY : undefined
+        y: prefs.windowY !== undefined ? prefs.windowY : undefined,
     };
 }
 
@@ -468,29 +498,29 @@ function saveSessionScreenshot(base64Data, sessionId, aiResponse = null) {
     try {
         const downloadsPath = path.join(os.homedir(), 'Downloads');
         const conversationsDir = path.join(downloadsPath, 'Ultron-Conversations');
-        
+
         // Ensure main conversations directory exists
         if (!fs.existsSync(conversationsDir)) {
             fs.mkdirSync(conversationsDir, { recursive: true });
         }
-        
+
         // Create a session-specific screenshots folder
         const screenshotsDir = path.join(conversationsDir, `session_${sessionId}_screenshots`);
         if (!fs.existsSync(screenshotsDir)) {
             fs.mkdirSync(screenshotsDir, { recursive: true });
         }
-        
+
         // Generate filename with timestamp
         const now = new Date();
         const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}_${Date.now() % 1000}`;
         const filename = `screenshot_${timestamp}.png`;
         const filepath = path.join(screenshotsDir, filename);
-        
+
         // Convert base64 to buffer and save
         const buffer = Buffer.from(base64Data, 'base64');
         fs.writeFileSync(filepath, buffer);
         // Screenshot saved
-        
+
         // Save AI response as metadata JSON file alongside the screenshot
         if (aiResponse) {
             const metadataFilename = `screenshot_${timestamp}_response.json`;
@@ -499,12 +529,12 @@ function saveSessionScreenshot(base64Data, sessionId, aiResponse = null) {
                 timestamp: Date.now(),
                 screenshotFilename: filename,
                 aiResponse: aiResponse,
-                responseTimestamp: new Date().toISOString()
+                responseTimestamp: new Date().toISOString(),
             };
             fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
             // Response metadata saved
         }
-        
+
         // Track screenshot in session with base64 data for history display
         const session = getSession(sessionId);
         if (session) {
@@ -515,12 +545,12 @@ function saveSessionScreenshot(base64Data, sessionId, aiResponse = null) {
                 timestamp: Date.now(),
                 filename: filename,
                 imagePath: filepath,
-                base64Data: base64Data,  // Store base64 for history display
-                aiResponse: aiResponse || undefined
+                base64Data: base64Data, // Store base64 for history display
+                aiResponse: aiResponse || undefined,
             });
             saveSession(sessionId, session);
         }
-        
+
         return { success: true, filename, path: filepath, hasResponse: Boolean(aiResponse) };
     } catch (error) {
         console.error('❌ Error saving screenshot:', error.message);
@@ -547,12 +577,12 @@ function exportSessionToDownloads(sessionId) {
         // Get Downloads folder path
         const downloadsPath = path.join(os.homedir(), 'Downloads');
         const conversationsDir = path.join(downloadsPath, 'Ultron-Conversations');
-        
+
         // Ensure directory structure exists
         if (!fs.existsSync(conversationsDir)) {
             fs.mkdirSync(conversationsDir, { recursive: true });
         }
-        
+
         // Create timestamp: YYYY-MM-DD_HHmmss
         const now = new Date();
         const year = now.getFullYear();
@@ -562,27 +592,27 @@ function exportSessionToDownloads(sessionId) {
         const minutes = String(now.getMinutes()).padStart(2, '0');
         const seconds = String(now.getSeconds()).padStart(2, '0');
         const timestamp = `${year}-${month}-${day}_${hours}${minutes}${seconds}`;
-        
+
         // Create conversation folder structure
         const conversationFolder = path.join(conversationsDir, `conversation_${timestamp}`);
         if (!fs.existsSync(conversationFolder)) {
             fs.mkdirSync(conversationFolder, { recursive: true });
         }
-        
+
         const files = [];
-        
+
         // 1. Export JSON data
         const jsonFilename = `conversation_${timestamp}.json`;
         const jsonFilepath = path.join(conversationFolder, jsonFilename);
         const exportData = {
             ...session,
             exportedAt: Date.now(),
-            exportedAtFormatted: now.toISOString()
+            exportedAtFormatted: now.toISOString(),
         };
         fs.writeFileSync(jsonFilepath, JSON.stringify(exportData, null, 2), 'utf8');
         console.log(`Session JSON exported to: ${jsonFilepath}`);
         files.push(jsonFilepath);
-        
+
         // 2. Export as readable Markdown (Q&A pairs with screenshot references)
         const mdFilename = `conversation_${timestamp}.md`;
         const mdFilepath = path.join(conversationFolder, mdFilename);
@@ -596,7 +626,7 @@ function exportSessionToDownloads(sessionId) {
         mdContent += `**Screenshots Captured:** ${session.screenshotReferences?.length || 0}\n`;
         mdContent += `**Note:** Screenshots saved in 'screenshots' subfolder\n\n`;
         mdContent += `---\n\n`;
-        
+
         if (session.conversationHistory && session.conversationHistory.length > 0) {
             session.conversationHistory.forEach((turn, index) => {
                 mdContent += `### Q${index + 1}: User\n\n`;
@@ -606,11 +636,11 @@ function exportSessionToDownloads(sessionId) {
                 mdContent += `---\n\n`;
             });
         }
-        
+
         fs.writeFileSync(mdFilepath, mdContent, 'utf8');
         console.log(`✅ Markdown exported to: ${mdFilepath}`);
         files.push(mdFilepath);
-        
+
         // 3. Copy screenshots to conversations folder
         const oldScreenshotsDir = path.join(conversationsDir, `session_${sessionId}_screenshots`);
         if (fs.existsSync(oldScreenshotsDir)) {
@@ -618,7 +648,7 @@ function exportSessionToDownloads(sessionId) {
             if (!fs.existsSync(screenshotsFolder)) {
                 fs.mkdirSync(screenshotsFolder, { recursive: true });
             }
-            
+
             // Copy all screenshots
             const screenshotFiles = fs.readdirSync(oldScreenshotsDir);
             screenshotFiles.forEach(file => {
@@ -629,7 +659,7 @@ function exportSessionToDownloads(sessionId) {
             console.log(`✅ ${screenshotFiles.length} screenshots copied to: ${screenshotsFolder}`);
             files.push(screenshotsFolder);
         }
-        
+
         return { success: true, filepaths: files, timestamp, folder: conversationFolder };
     } catch (error) {
         console.error('Error exporting session:', error.message);
@@ -668,6 +698,12 @@ module.exports = {
     getPreferences,
     setPreferences,
     updatePreference,
+    getSystemInstruction,
+    setSystemInstruction,
+    getDeveloperInstruction,
+    setDeveloperInstruction,
+    getFullSystemPrompt,
+    setFullSystemPrompt,
 
     // Keybinds
     getKeybinds,
@@ -700,5 +736,5 @@ module.exports = {
     exportSessionToDownloads,
 
     // Clear all
-    clearAllData
+    clearAllData,
 };

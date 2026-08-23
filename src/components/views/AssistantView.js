@@ -10,7 +10,11 @@ export class AssistantView extends LitElement {
         }
 
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family:
+                'Inter',
+                -apple-system,
+                BlinkMacSystemFont,
+                sans-serif;
             cursor: default;
         }
 
@@ -24,6 +28,7 @@ export class AssistantView extends LitElement {
         .response-container {
             flex: 1;
             overflow-y: auto;
+            overflow-x: hidden;
             font-size: var(--response-font-size, 16px);
             line-height: 1.6;
             background: var(--bg-primary);
@@ -32,6 +37,8 @@ export class AssistantView extends LitElement {
             scroll-behavior: smooth;
             user-select: text;
             cursor: text;
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
 
         .response-container * {
@@ -58,18 +65,34 @@ export class AssistantView extends LitElement {
             margin: 1em 0 0.5em 0;
             color: var(--text-color);
             font-weight: 600;
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
 
-        .response-container h1 { font-size: 1.6em; }
-        .response-container h2 { font-size: 1.4em; }
-        .response-container h3 { font-size: 1.2em; }
-        .response-container h4 { font-size: 1.1em; }
-        .response-container h5 { font-size: 1em; }
-        .response-container h6 { font-size: 0.9em; }
+        .response-container h1 {
+            font-size: 1.6em;
+        }
+        .response-container h2 {
+            font-size: 1.4em;
+        }
+        .response-container h3 {
+            font-size: 1.2em;
+        }
+        .response-container h4 {
+            font-size: 1.1em;
+        }
+        .response-container h5 {
+            font-size: 1em;
+        }
+        .response-container h6 {
+            font-size: 0.9em;
+        }
 
         .response-container p {
             margin: 0.6em 0;
             color: var(--text-color);
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
 
         .response-container ul,
@@ -77,10 +100,14 @@ export class AssistantView extends LitElement {
             margin: 0.6em 0;
             padding-left: 1.5em;
             color: var(--text-color);
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
 
         .response-container li {
             margin: 0.3em 0;
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
 
         .response-container blockquote {
@@ -88,6 +115,8 @@ export class AssistantView extends LitElement {
             padding: 0.5em 1em;
             border-left: 2px solid var(--border-default);
             background: var(--bg-secondary);
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
 
         .response-container code {
@@ -96,6 +125,8 @@ export class AssistantView extends LitElement {
             border-radius: 3px;
             font-family: 'SF Mono', Monaco, monospace;
             font-size: 0.85em;
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
 
         .response-container pre {
@@ -105,11 +136,17 @@ export class AssistantView extends LitElement {
             padding: 12px;
             overflow-x: auto;
             margin: 0.8em 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
 
         .response-container pre code {
             background: none;
             padding: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
 
         .response-container a {
@@ -277,9 +314,11 @@ export class AssistantView extends LitElement {
             white-space: nowrap;
             opacity: 0;
             visibility: hidden;
-            transition: opacity 0.15s ease, visibility 0.15s ease;
+            transition:
+                opacity 0.15s ease,
+                visibility 0.15s ease;
             pointer-events: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
             z-index: 100;
         }
 
@@ -319,7 +358,7 @@ export class AssistantView extends LitElement {
         .tooltip-note {
             margin-top: 6px;
             padding-top: 6px;
-            border-top: 1px solid rgba(255,255,255,0.1);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
             opacity: 0.5;
             font-size: 10px;
         }
@@ -393,7 +432,7 @@ export class AssistantView extends LitElement {
         this.responses = [];
         this.currentResponseIndex = -1;
         this.selectedProfile = 'interview';
-        this.onSendText = () => { };
+        this.onSendText = () => {};
         this.flashCount = 0;
         this.flashLiteCount = 0;
         this.aiProvider = 'gemini';
@@ -454,7 +493,7 @@ export class AssistantView extends LitElement {
     wrapWordsInSpans(html) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
-        const tagsToSkip = ['PRE'];
+        const tagsToSkip = ['PRE', 'CODE'];
 
         function wrap(node) {
             if (node.nodeType === Node.TEXT_NODE && node.textContent.trim() && !tagsToSkip.includes(node.parentNode.tagName)) {
@@ -693,46 +732,82 @@ export class AssistantView extends LitElement {
                 <div class="response-container" id="responseContainer"></div>
             </div>
 
-            ${!this.isRecording ? html`
-                <div class="text-input-container">
-                    <button class="nav-button" @click=${this.navigateToPreviousResponse} ?disabled=${this.currentResponseIndex <= 0}>
-                        <svg width="24px" height="24px" stroke-width="1.7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                    </button>
+            ${
+                !this.isRecording
+                    ? html`
+                          <div class="text-input-container">
+                              <button class="nav-button" @click=${this.navigateToPreviousResponse} ?disabled=${this.currentResponseIndex <= 0}>
+                                  <svg
+                                      width="24px"
+                                      height="24px"
+                                      stroke-width="1.7"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                      <path
+                                          d="M15 6L9 12L15 18"
+                                          stroke="currentColor"
+                                          stroke-width="1.7"
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                      ></path>
+                                  </svg>
+                              </button>
 
-                    ${this.responses.length > 0 ? html`<span class="response-counter">${responseCounter}</span>` : ''}
+                              ${this.responses.length > 0 ? html`<span class="response-counter">${responseCounter}</span>` : ''}
 
-                    <button class="nav-button" @click=${this.navigateToNextResponse} ?disabled=${this.currentResponseIndex >= this.responses.length - 1}>
-                        <svg width="24px" height="24px" stroke-width="1.7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                    </button>
+                              <button
+                                  class="nav-button"
+                                  @click=${this.navigateToNextResponse}
+                                  ?disabled=${this.currentResponseIndex >= this.responses.length - 1}
+                              >
+                                  <svg
+                                      width="24px"
+                                      height="24px"
+                                      stroke-width="1.7"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                      <path
+                                          d="M9 6L15 12L9 18"
+                                          stroke="currentColor"
+                                          stroke-width="1.7"
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                      ></path>
+                                  </svg>
+                              </button>
 
-                    <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
+                              <input type="text" id="textInput" placeholder="Type a message to the AI..." @keydown=${this.handleTextKeydown} />
 
-                    <div class="screen-answer-btn-wrapper">
-                        <div class="tooltip">
-                            <div class="tooltip-row">
-                                <span class="tooltip-label">Flash</span>
-                                <span class="tooltip-value">${this.flashCount}/20</span>
-                            </div>
-                            <div class="tooltip-row">
-                                <span class="tooltip-label">Flash Lite</span>
-                                <span class="tooltip-value">${this.flashLiteCount}/20</span>
-                            </div>
-                            <div class="tooltip-note">Resets every 24 hours</div>
-                        </div>
-                        <button class="screen-answer-btn" @click=${this.handleScreenAnswer}>
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.898l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684ZM13.949 13.684a1 1 0 0 0-1.898 0l-.184.551a1 1 0 0 1-.632.633l-.551.183a1 1 0 0 0 0 1.898l.551.183a1 1 0 0 1 .633.633l.183.551a1 1 0 0 0 1.898 0l.184-.551a1 1 0 0 1 .632-.633l.551-.183a1 1 0 0 0 0-1.898l-.551-.184a1 1 0 0 1-.633-.632l-.183-.551Z" />
-                            </svg>
-                            <span>Analyze screen</span>
-                            <span class="usage-count">(${this.getTotalUsed()}/${this.getTotalAvailable()})</span>
-                        </button>
-                    </div>
-                </div>
-            ` : ''}
+                              <div class="screen-answer-btn-wrapper">
+                                  <div class="tooltip">
+                                      <div class="tooltip-row">
+                                          <span class="tooltip-label">Flash</span>
+                                          <span class="tooltip-value">${this.flashCount}/20</span>
+                                      </div>
+                                      <div class="tooltip-row">
+                                          <span class="tooltip-label">Flash Lite</span>
+                                          <span class="tooltip-value">${this.flashLiteCount}/20</span>
+                                      </div>
+                                      <div class="tooltip-note">Resets every 24 hours</div>
+                                  </div>
+                                  <button class="screen-answer-btn" @click=${this.handleScreenAnswer}>
+                                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                          <path
+                                              d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.898l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684ZM13.949 13.684a1 1 0 0 0-1.898 0l-.184.551a1 1 0 0 1-.632.633l-.551.183a1 1 0 0 0 0 1.898l.551.183a1 1 0 0 1 .633.633l.183.551a1 1 0 0 0 1.898 0l.184-.551a1 1 0 0 1 .632-.633l.551-.183a1 1 0 0 0 0-1.898l-.551-.184a1 1 0 0 1-.633-.632l-.183-.551Z"
+                                          />
+                                      </svg>
+                                      <span>Analyze screen</span>
+                                      <span class="usage-count">(${this.getTotalUsed()}/${this.getTotalAvailable()})</span>
+                                  </button>
+                              </div>
+                          </div>
+                      `
+                    : ''
+            }
         `;
     }
 }

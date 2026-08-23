@@ -16,19 +16,19 @@ flowchart TB
         A[DiseaseDetection.tsx] -->|Upload Image| B[FileReader API]
         B -->|Base64 Conversion| C[analyzeCropImage]
     end
-    
+
     subgraph Router ["AI Router (ai.ts)"]
         C --> D{Provider Check}
         D -->|groq| E[groqAI.analyzeCropImage]
         D -->|gemini| F[geminiAI.analyzeCropImage]
     end
-    
+
     subgraph GroqService ["Groq Service (groq.ts)"]
         E --> G[OpenAI SDK]
         G -->|Vision Request| H[Groq API]
         H -->|JSON Response| I[Parse & Validate]
     end
-    
+
     I --> J[Display Results]
 ```
 
@@ -36,10 +36,10 @@ flowchart TB
 
 ## 📁 File Structure
 
-| File | Purpose |
-|------|---------|
-| [src/lib/groq.ts](file:///c:/Users/marsh/OneDrive/Desktop/MAJOR%20PROJECT/Farm-Connnect/src/lib/groq.ts) | Groq AI service with vision model integration |
-| [src/lib/ai.ts](file:///c:/Users/marsh/OneDrive/Desktop/MAJOR%20PROJECT/Farm-Connnect/src/lib/ai.ts) | Centralized AI routing between Groq and Gemini |
+| File                                                                                                                                   | Purpose                                           |
+| -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| [src/lib/groq.ts](file:///c:/Users/marsh/OneDrive/Desktop/MAJOR%20PROJECT/Farm-Connnect/src/lib/groq.ts)                               | Groq AI service with vision model integration     |
+| [src/lib/ai.ts](file:///c:/Users/marsh/OneDrive/Desktop/MAJOR%20PROJECT/Farm-Connnect/src/lib/ai.ts)                                   | Centralized AI routing between Groq and Gemini    |
 | [src/pages/DiseaseDetection.tsx](file:///c:/Users/marsh/OneDrive/Desktop/MAJOR%20PROJECT/Farm-Connnect/src/pages/DiseaseDetection.tsx) | UI component for image upload and results display |
 
 ---
@@ -65,9 +65,9 @@ class GroqAIService {
             throw new Error('Groq API key not configured. Please add it in Settings.');
         }
         return new OpenAI({
-            baseURL: "https://api.groq.com/openai/v1",
+            baseURL: 'https://api.groq.com/openai/v1',
             apiKey: apiKey,
-            dangerouslyAllowBrowser: true,  // Required for browser-side API calls
+            dangerouslyAllowBrowser: true, // Required for browser-side API calls
         });
     }
 
@@ -78,7 +78,7 @@ class GroqAIService {
     removeAPIKey() {
         localStorage.removeItem('groq_api_key');
     }
-    
+
     // ... methods
 }
 
@@ -87,6 +87,7 @@ export const groqAI = new GroqAIService();
 
 > [!IMPORTANT]
 > **Key Design Decisions:**
+>
 > - API keys are stored in `localStorage` for user-specific configuration
 > - `dangerouslyAllowBrowser: true` enables client-side API calls (no backend proxy needed)
 > - OpenAI SDK is used for compatibility since Groq's API follows OpenAI's format
@@ -97,7 +98,7 @@ export const groqAI = new GroqAIService();
 
 The core method `analyzeCropImage` sends base64-encoded images to Groq's vision model:
 
-```typescript
+````typescript
 export interface AICropAnalysis {
     disease: string;
     confidence: number;
@@ -223,10 +224,11 @@ Respond with a JSON object with this exact structure:
         throw new Error('Could not get a diagnosis from the Groq model. Please check your API key and try again.');
     }
 }
-```
+````
 
 > [!NOTE]
 > **Model Selection:** The **Llama 4 Scout 17B** model was chosen because:
+>
 > - It's a vision-capable model that can process images
 > - High accuracy for agricultural/plant identification tasks
 > - Fast inference times on Groq's LPU infrastructure
@@ -252,7 +254,7 @@ export interface ModelConfig {
 const SETTINGS_KEY = 'farm-connect-model-settings';
 
 const getDefaultConfig = (): ModelConfig => ({
-    diseaseDetection: 'groq',  // Default to Groq for disease detection
+    diseaseDetection: 'groq', // Default to Groq for disease detection
     chatbot: 'groq',
 });
 
@@ -303,7 +305,7 @@ export type { AICropAnalysis };
 The UI handles image upload and triggers the AI analysis:
 
 ```typescript
-import { analyzeCropImage } from "@/lib/ai";
+import { analyzeCropImage } from '@/lib/ai';
 
 // State management
 const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -314,20 +316,20 @@ const [result, setResult] = useState<DetectionResult | null>(null);
 const handleImageUpload = (file: File) => {
     if (file && file.type.startsWith('image/')) {
         const reader = new FileReader();
-        reader.onload = (e) => {
-            setSelectedImage(e.target?.result as string);  // Base64 data URL
+        reader.onload = e => {
+            setSelectedImage(e.target?.result as string); // Base64 data URL
             setResult(null);
             toast({
-                title: "Image Uploaded",
-                description: "Ready for AI analysis",
+                title: 'Image Uploaded',
+                description: 'Ready for AI analysis',
             });
         };
-        reader.readAsDataURL(file);  // Convert to base64
+        reader.readAsDataURL(file); // Convert to base64
     } else {
         toast({
-            title: "Invalid File",
-            description: "Please select a valid image file",
-            variant: "destructive",
+            title: 'Invalid File',
+            description: 'Please select a valid image file',
+            variant: 'destructive',
         });
     }
 };
@@ -353,11 +355,11 @@ const startAnalysis = async () => {
     try {
         // Call the centralized AI function
         const aiResult = await analyzeCropImage(selectedImage);
-        
+
         setResult(aiResult);
 
         toast({
-            title: "AI Analysis Complete",
+            title: 'AI Analysis Complete',
             description: `AI Analysis with ${aiResult.confidence}% confidence`,
         });
 
@@ -369,16 +371,15 @@ const startAnalysis = async () => {
             severity: aiResult.severity,
             treatment: aiResult.treatment,
             userId: user?.id,
-            location: user?.location
+            location: user?.location,
         });
-
     } catch (error) {
         console.error('Analysis error:', error);
-        
+
         toast({
-            title: "Analysis Error",
-            description: "Using fallback analysis. Please check your internet connection.",
-            variant: "destructive"
+            title: 'Analysis Error',
+            description: 'Using fallback analysis. Please check your internet connection.',
+            variant: 'destructive',
         });
     } finally {
         setIsAnalyzing(false);
@@ -394,15 +395,15 @@ The vision model returns a structured JSON response:
 
 ```typescript
 interface VisionModelResponse {
-    isPlant: boolean;           // Whether the image contains a plant
-    hasDisease: boolean;        // Whether disease/pest is detected
-    disease: string;            // Disease name or "Healthy Plant"
-    confidence: number;         // 0-100 percentage
+    isPlant: boolean; // Whether the image contains a plant
+    hasDisease: boolean; // Whether disease/pest is detected
+    disease: string; // Disease name or "Healthy Plant"
+    confidence: number; // 0-100 percentage
     severity: 'Low' | 'Medium' | 'High';
-    description: string;        // Visual evidence description
-    treatment: string[];        // Array of treatment steps
-    prevention: string[];       // Array of prevention methods
-    affectedArea: number;       // Percentage of plant affected (0-100)
+    description: string; // Visual evidence description
+    treatment: string[]; // Array of treatment steps
+    prevention: string[]; // Array of prevention methods
+    affectedArea: number; // Percentage of plant affected (0-100)
 }
 ```
 
@@ -414,10 +415,10 @@ Users configure their Groq API key in the Settings/Profile page:
 
 ```typescript
 // Save API key
-groqAI.updateAPIKey(apiKey);  // Stores in localStorage
+groqAI.updateAPIKey(apiKey); // Stores in localStorage
 
 // Remove API key
-groqAI.removeAPIKey();  // Removes from localStorage
+groqAI.removeAPIKey(); // Removes from localStorage
 
 // Check if key exists
 const hasKey = !!localStorage.getItem('groq_api_key');
@@ -455,13 +456,13 @@ sequenceDiagram
 
 ## ⚙️ Configuration Options
 
-| Setting | Value | Location |
-|---------|-------|----------|
-| **Model** | `meta-llama/llama-4-scout-17b-16e-instruct` | `groq.ts` line 83 |
-| **Max Tokens** | `1500` | `groq.ts` line 101 |
-| **Temperature** | `0.2` | `groq.ts` line 102 |
-| **Base URL** | `https://api.groq.com/openai/v1` | `groq.ts` line 25 |
-| **Default Provider** | `groq` | `ai.ts` line 14 |
+| Setting              | Value                                       | Location           |
+| -------------------- | ------------------------------------------- | ------------------ |
+| **Model**            | `meta-llama/llama-4-scout-17b-16e-instruct` | `groq.ts` line 83  |
+| **Max Tokens**       | `1500`                                      | `groq.ts` line 101 |
+| **Temperature**      | `0.2`                                       | `groq.ts` line 102 |
+| **Base URL**         | `https://api.groq.com/openai/v1`            | `groq.ts` line 25  |
+| **Default Provider** | `groq`                                      | `ai.ts` line 14    |
 
 ---
 
@@ -472,10 +473,10 @@ sequenceDiagram
 2. **Configure the Key:** Go to Settings/Profile in the app and enter your Groq API key
 
 3. **Test Disease Detection:**
-   - Navigate to the Disease Detection page
-   - Upload a clear image of a plant (healthy or diseased)
-   - Click "Start AI Analysis"
-   - View results including disease identification, confidence, treatment, and prevention
+    - Navigate to the Disease Detection page
+    - Upload a clear image of a plant (healthy or diseased)
+    - Click "Start AI Analysis"
+    - View results including disease identification, confidence, treatment, and prevention
 
 ---
 
@@ -489,13 +490,13 @@ import { saveModelConfig } from '@/lib/ai';
 // Switch to Groq
 saveModelConfig({
     diseaseDetection: 'groq',
-    chatbot: 'groq'
+    chatbot: 'groq',
 });
 
 // Switch to Gemini
 saveModelConfig({
     diseaseDetection: 'gemini',
-    chatbot: 'gemini'
+    chatbot: 'gemini',
 });
 ```
 
@@ -505,7 +506,7 @@ saveModelConfig({
 
 ```json
 {
-    "openai": "^6.9.1"  // Used for Groq API compatibility
+    "openai": "^6.9.1" // Used for Groq API compatibility
 }
 ```
 
@@ -528,11 +529,11 @@ The implementation includes comprehensive error handling:
 
 ## 📈 Performance Considerations
 
-| Aspect | Implementation |
-|--------|---------------|
-| **Latency** | Groq's LPU delivers sub-second inference |
-| **Image Size** | Base64 encoding increases payload by ~33% |
-| **Token Limit** | 1500 tokens balances detail vs. speed |
+| Aspect          | Implementation                                |
+| --------------- | --------------------------------------------- |
+| **Latency**     | Groq's LPU delivers sub-second inference      |
+| **Image Size**  | Base64 encoding increases payload by ~33%     |
+| **Token Limit** | 1500 tokens balances detail vs. speed         |
 | **Temperature** | 0.2 ensures consistent, deterministic outputs |
 
 ---

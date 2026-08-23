@@ -5,6 +5,7 @@
 The Google Gemini Multimodal Live API provides a low-latency, full-duplex WebSocket connection enabling continuous real-time streaming of audio into Gemini while receiving real-time transcription, speaker diarization, and generated responses.
 
 In this architecture, Gemini Live serves two critical roles:
+
 1. **Real-time Speech Recognition & Speaker Diarization**: Continuously transcribing who is speaking (`[Interviewer]` vs `[Candidate]`).
 2. **Conversation Orchestrator**: Handling turn completions and acting as the primary conversational bridge.
 
@@ -13,11 +14,13 @@ In this architecture, Gemini Live serves two critical roles:
 ## 2. Dependencies & Initialization
 
 ### Installation
+
 ```bash
 npm install @google/genai@^1.2.0 ws
 ```
 
 ### SDK Client Configuration
+
 ```javascript
 const { GoogleGenAI, Modality } = require('@google/genai');
 
@@ -33,6 +36,7 @@ const client = new GoogleGenAI({
 ## 3. Establishing the Live Session
 
 ### Session Connection & Configuration
+
 ```javascript
 async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US') {
     const client = new GoogleGenAI({
@@ -56,23 +60,23 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             responseModalities: [Modality.AUDIO],
             proactivity: { proactiveAudio: true },
             outputAudioTranscription: {}, // Request text transcript of model output
-            
+
             // Speaker Diarization: distinguishes between multiple speakers
             inputAudioTranscription: {
                 enableSpeakerDiarization: true,
                 minSpeakerCount: 2,
                 maxSpeakerCount: 2,
             },
-            
+
             // Prevent context overflow during long sessions
             contextWindowCompression: { slidingWindow: {} },
             speechConfig: { languageCode: language },
-            
+
             // System instructions defining the persona & response brevity
             systemInstruction: {
                 parts: [{ text: systemPrompt }],
             },
-            
+
             // Optional real-time tools (e.g. Google Search)
             tools: [{ googleSearch: {} }],
         },
@@ -144,6 +148,7 @@ function handleSessionMessage(message) {
 ## 5. Speaker Diarization Formatting
 
 Gemini Live provides speaker tags with integer IDs (`speakerId: 1`, `speakerId: 2`). In interview or meeting contexts:
+
 - `speakerId: 1` -> **Interviewer** / Other Speaker
 - `speakerId: 2` -> **Candidate** / User
 
@@ -201,9 +206,7 @@ function buildContextMessage() {
 
     if (validTurns.length === 0) return null;
 
-    const contextLines = validTurns.map(
-        turn => `[Interviewer]: ${turn.transcription.trim()}\n[Your answer]: ${turn.ai_response.trim()}`
-    );
+    const contextLines = validTurns.map(turn => `[Interviewer]: ${turn.transcription.trim()}\n[Your answer]: ${turn.ai_response.trim()}`);
 
     return `Session reconnected. Here's the conversation so far:\n\n${contextLines.join('\n\n')}\n\nContinue from here.`;
 }

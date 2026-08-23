@@ -63,11 +63,12 @@ async function sendToGroq(transcription) {
             body: JSON.stringify({
                 model: modelToUse,
                 messages: [
-                    { 
-                        role: 'system', 
-                        content: currentSystemPrompt || 'You are an ultra-concise assistant. Give direct, ready-to-speak answers in 1-3 bullet points.' 
-                    }, 
-                    ...groqConversationHistory
+                    {
+                        role: 'system',
+                        content:
+                            currentSystemPrompt || 'You are an ultra-concise assistant. Give direct, ready-to-speak answers in 1-3 bullet points.',
+                    },
+                    ...groqConversationHistory,
                 ],
                 stream: true,
                 temperature: 0.7,
@@ -104,10 +105,10 @@ async function sendToGroq(transcription) {
                     try {
                         const json = JSON.parse(data);
                         const token = json.choices?.[0]?.delta?.content || '';
-                        
+
                         if (token) {
                             fullText += token;
-                            
+
                             // Strip reasoning tags in real time before sending to UI
                             const displayText = stripThinkingTags(fullText);
                             if (displayText) {
@@ -193,7 +194,7 @@ RESPONSE FORMAT REQUIREMENTS:
 
     meeting: `You are a meeting executive assistant. Provide concise, direct responses, action items, or numbers to state in business meetings.`,
 
-    exam: `You are an exam assistant. Give the exact question, correct answer option, and 1 sentence justification.`
+    exam: `You are an exam assistant. Give the exact question, correct answer option, and 1 sentence justification.`,
 };
 ```
 
@@ -207,7 +208,7 @@ To prevent unexpected billing or rate limit exhaustion (RPD/RPM):
 function trackUsage(provider, model, inputLength, outputLength) {
     const totalChars = inputLength + outputLength;
     console.log(`[Usage] ${provider}:${model} used ${totalChars} characters`);
-    
+
     // Store in daily limits registry
     incrementCharUsage(provider, model, totalChars);
 }

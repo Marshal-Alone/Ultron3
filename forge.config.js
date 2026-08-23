@@ -51,8 +51,8 @@ module.exports = {
                     genericName: 'Audio Service',
                     description: 'Windows Audio Device Graph Isolation',
                     categories: ['System', 'Utility'],
-                    icon: 'src/assets/jarvis_icon.png'
-                }
+                    icon: 'src/assets/jarvis_icon.png',
+                },
             },
         },
     ],

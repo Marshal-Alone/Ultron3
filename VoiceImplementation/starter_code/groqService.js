@@ -11,10 +11,10 @@ class GroqService {
         this.systemPrompt = 'You are a concise, direct on-screen assistant. Give direct, ready-to-speak answers in 1-3 bullet points.';
         this.conversationHistory = [];
         this.isGenerating = false;
-        
-        this.onToken = null;       // (displayText) => void
-        this.onComplete = null;    // (fullCleanedText) => void
-        this.onError = null;       // (errorMessage) => void
+
+        this.onToken = null; // (displayText) => void
+        this.onComplete = null; // (fullCleanedText) => void
+        this.onError = null; // (errorMessage) => void
     }
 
     init({ apiKey, model = 'qwen/qwen3.6-27b', systemPrompt }) {
@@ -57,10 +57,7 @@ class GroqService {
                 },
                 body: JSON.stringify({
                     model: this.model,
-                    messages: [
-                        { role: 'system', content: this.systemPrompt },
-                        ...this.conversationHistory,
-                    ],
+                    messages: [{ role: 'system', content: this.systemPrompt }, ...this.conversationHistory],
                     stream: true,
                     temperature: 0.7,
                     max_completion_tokens: 4096,

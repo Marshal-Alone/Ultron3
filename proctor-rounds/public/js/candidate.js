@@ -125,7 +125,7 @@ function connectSocket() {
         disconnectedOverlay.classList.add('active');
     });
 
-    socket.on('session_info', (info) => {
+    socket.on('session_info', info => {
         document.getElementById('sessionTitle').textContent = `Assessment — ${info.candidateName}`;
         if (info.language) {
             langSelector.value = info.language;
@@ -135,7 +135,7 @@ function connectSocket() {
         }
     });
 
-    socket.on('session_status', (data) => {
+    socket.on('session_status', data => {
         if (data.status === 'ended') {
             sessionEndedBanner.classList.add('active');
             if (editorView) {
@@ -147,7 +147,7 @@ function connectSocket() {
         }
     });
 
-    socket.on('error_msg', (data) => {
+    socket.on('error_msg', data => {
         alert(data.message);
         window.location.href = '/lobby.html';
     });
@@ -268,7 +268,7 @@ function attachGlobalListeners() {
     });
 
     // Paste on editor
-    editorContainer.addEventListener('paste', (e) => {
+    editorContainer.addEventListener('paste', e => {
         lastActivityTime = Date.now();
         const clipboardData = e.clipboardData || window.clipboardData;
         const textLength = clipboardData ? clipboardData.getData('text').length : 0;
@@ -284,14 +284,14 @@ function attachGlobalListeners() {
     });
 
     // Right-click
-    editorContainer.addEventListener('contextmenu', (e) => {
+    editorContainer.addEventListener('contextmenu', e => {
         lastActivityTime = Date.now();
         emitEvent('right_click', {});
     });
 
     // Keystroke metadata (throttled — 1 event per second max)
     let lastKeystrokeEmit = 0;
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', e => {
         lastActivityTime = Date.now();
         idleNotified = false;
         const now = Date.now();

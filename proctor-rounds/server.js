@@ -100,7 +100,7 @@ app.get('/api/session/:id/events', (req, res) => {
 
 // ── Socket.IO ───────────────────────────────────────────────────────────
 
-io.on('connection', (socket) => {
+io.on('connection', socket => {
     const { sessionId, token, role } = socket.handshake.query;
 
     const session = sessions.get(sessionId);
@@ -160,7 +160,7 @@ io.on('connection', (socket) => {
         }
 
         // ── Candidate events ────────────────────────────────────────
-        socket.on('activity_event', (data) => {
+        socket.on('activity_event', data => {
             const event = {
                 id: generateId(),
                 sessionId,
@@ -175,7 +175,7 @@ io.on('connection', (socket) => {
         });
 
         // Editor content updates
-        socket.on('editor_update', (data) => {
+        socket.on('editor_update', data => {
             const snap = {
                 content: data.content,
                 timestamp: serverTimestamp(),
@@ -187,7 +187,7 @@ io.on('connection', (socket) => {
         });
 
         // Editor snapshot (periodic full content)
-        socket.on('editor_snapshot', (data) => {
+        socket.on('editor_snapshot', data => {
             const snap = {
                 content: data.content,
                 timestamp: serverTimestamp(),
@@ -198,7 +198,7 @@ io.on('connection', (socket) => {
         });
 
         // Buffered events (sent on reconnect)
-        socket.on('buffered_events', (eventsArray) => {
+        socket.on('buffered_events', eventsArray => {
             if (!Array.isArray(eventsArray)) return;
             for (const data of eventsArray) {
                 const event = {

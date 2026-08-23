@@ -201,25 +201,61 @@ Provide direct exam answers in **markdown format**. Include the question text, t
     },
 };
 
-function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled = true) {
-    const sections = [promptParts.intro, '\n\n', promptParts.formatRequirements];
+function buildSystemPrompt(promptParts, customPrompt = '', googleSearchEnabled = true, systemInstructionOverride = '', developerInstruction = '') {
+    const baseIntro = systemInstructionOverride && systemInstructionOverride.trim() ? systemInstructionOverride.trim() : promptParts.intro;
+    const sections = [baseIntro, '\n\n', promptParts.formatRequirements];
 
     // Only add search usage section if Google Search is enabled
     if (googleSearchEnabled) {
         sections.push('\n\n', promptParts.searchUsage);
     }
 
-    sections.push('\n\n', promptParts.content, '\n\nUser-provided context\n-----\n', customPrompt, '\n-----\n\n', promptParts.outputInstructions);
+    if (developerInstruction && developerInstruction.trim()) {
+        sections.push('\n\n**DEVELOPER / META INSTRUCTIONS:**\n', developerInstruction.trim());
+    }
+
+    sections.push('\n\n', promptParts.content);
+
+    if (customPrompt && customPrompt.trim()) {
+        sections.push('\n\nUser-provided context\n-----\n', customPrompt.trim(), '\n-----\n');
+    }
+
+    sections.push('\n\n', promptParts.outputInstructions);
 
     return sections.join('');
 }
 
-function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true) {
+function getDefaultSystemPrompt(
+    profile = 'interview',
+    customPrompt = '',
+    googleSearchEnabled = true,
+    systemInstructionOverride = '',
+    developerInstruction = ''
+) {
     const promptParts = profilePrompts[profile] || profilePrompts.interview;
-    return buildSystemPrompt(promptParts, customPrompt, googleSearchEnabled);
+    return buildSystemPrompt(promptParts, customPrompt, googleSearchEnabled, systemInstructionOverride, developerInstruction);
+}
+
+function getSystemPrompt(
+    profile,
+    customPrompt = '',
+    googleSearchEnabled = true,
+    systemInstructionOverride = '',
+    developerInstruction = '',
+    fullSystemPromptOverride = ''
+) {
+    if (fullSystemPromptOverride && fullSystemPromptOverride.trim()) {
+        let prompt = fullSystemPromptOverride.trim();
+        if (customPrompt && customPrompt.trim() && !prompt.includes(customPrompt.trim())) {
+            prompt += `\n\nUser-provided context\n-----\n${customPrompt.trim()}\n-----\n`;
+        }
+        return prompt;
+    }
+    return getDefaultSystemPrompt(profile, customPrompt, googleSearchEnabled, systemInstructionOverride, developerInstruction);
 }
 
 module.exports = {
     profilePrompts,
     getSystemPrompt,
+    getDefaultSystemPrompt,
 };

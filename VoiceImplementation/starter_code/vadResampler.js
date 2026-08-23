@@ -10,7 +10,7 @@ class VadResampler {
         this.energyThreshold = options.energyThreshold || 0.015;
         this.speechFramesRequired = options.speechFramesRequired || 2;
         this.silenceFramesRequired = options.silenceFramesRequired || 20;
-        
+
         this.isSpeaking = false;
         this.speechBuffers = [];
         this.silenceFrameCount = 0;
@@ -34,21 +34,17 @@ class VadResampler {
             const sourcePosition = (i * 3) / 2;
             const sourceIndex = Math.floor(sourcePosition);
             const fraction = sourcePosition - sourceIndex;
-            
+
             const firstSample = combined.readInt16LE(sourceIndex * 2);
-            const secondSample = sourceIndex + 1 < inputSamples 
-                ? combined.readInt16LE((sourceIndex + 1) * 2) 
-                : firstSample;
-                
+            const secondSample = sourceIndex + 1 < inputSamples ? combined.readInt16LE((sourceIndex + 1) * 2) : firstSample;
+
             const interpolated = Math.round(firstSample + fraction * (secondSample - firstSample));
             outputBuffer.writeInt16LE(Math.max(-32768, Math.min(32767, interpolated)), i * 2);
         }
 
         const consumed = Math.ceil((outputSamples * 3) / 2);
         const remainderStart = consumed * 2;
-        this.resampleRemainder = remainderStart < combined.length 
-            ? combined.slice(remainderStart) 
-            : Buffer.alloc(0);
+        this.resampleRemainder = remainderStart < combined.length ? combined.slice(remainderStart) : Buffer.alloc(0);
 
         return outputBuffer;
     }
@@ -82,7 +78,8 @@ class VadResampler {
                 const audioData = Buffer.concat(this.speechBuffers);
                 this.speechBuffers = [];
 
-                if (audioData.length >= 16000) { // At least 0.5s of speech
+                if (audioData.length >= 16000) {
+                    // At least 0.5s of speech
                     this.onSpeechEnd?.(audioData);
                 }
                 return;

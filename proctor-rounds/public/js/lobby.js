@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ── Copy Buttons ────────────────────────────────────────────────
-    document.querySelectorAll('.btn-copy').forEach((btn) => {
+    document.querySelectorAll('.btn-copy').forEach(btn => {
         btn.addEventListener('click', () => {
             const targetId = btn.getAttribute('data-target');
             const input = document.getElementById(targetId);

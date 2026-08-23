@@ -1,9 +1,11 @@
 const { GoogleGenAI, Modality } = require('@google/genai');
 const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
-const { saveDebugAudio } = require('../audioUtils');
+const { saveDebugAudio, convertStereoToMono } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
-const { getAvailableModel, incrementLimitCount, getApiKey } = require('../storage');
+const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, getPreferences } = require('../storage');
+const { groqAI } = require('./groq');
+const PromptLogger = require('./promptLogger');
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -13,12 +15,15 @@ let screenAnalysisHistory = [];
 let currentProfile = null;
 let currentCustomPrompt = null;
 let isInitializingSession = false;
+let pendingSpeechTranscript = '';
+let speechDebounceTimer = null;
 
 function formatSpeakerResults(results) {
     let text = '';
     for (const result of results) {
-        if (result.transcript && result.speakerId) {
-            const speakerLabel = result.speakerId === 1 ? 'Interviewer' : 'Candidate';
+        if (result.transcript) {
+            const speakerId = result.speakerId || 1;
+            const speakerLabel = speakerId === 1 ? 'Interviewer' : 'Candidate';
             text += `[${speakerLabel}]: ${result.transcript}\n`;
         }
     }
@@ -35,7 +40,7 @@ let messageBuffer = '';
 let isUserClosing = false;
 let sessionParams = null;
 let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 3;
+const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = 2000;
 
 function sendToRenderer(channel, data) {
@@ -52,9 +57,7 @@ function buildContextMessage() {
 
     if (validTurns.length === 0) return null;
 
-    const contextLines = validTurns.map(turn =>
-        `[Interviewer]: ${turn.transcription.trim()}\n[Your answer]: ${turn.ai_response.trim()}`
-    );
+    const contextLines = validTurns.map(turn => `[Interviewer]: ${turn.transcription.trim()}\n[Your answer]: ${turn.ai_response.trim()}`);
 
     return `Session reconnected. Here's the conversation so far:\n\n${contextLines.join('\n\n')}\n\nContinue from here.`;
 }
@@ -71,17 +74,22 @@ function initializeNewSession(profile = null, customPrompt = null) {
 
     // Notify main process to track this session ID
     try {
-        ipcMain.emit('session-started', { session: { id: currentSessionId } }, currentSessionId);
+        if (ipcMain && typeof ipcMain.emit === 'function') {
+            ipcMain.emit('session-started', { session: { id: currentSessionId } }, currentSessionId);
+        }
     } catch (e) {
         console.error('Could not notify main process of session start:', e);
     }
+
+    // Reset Groq conversation history for a clean session
+    groqAI.clearHistory();
 
     // Save initial session with profile context
     if (profile) {
         sendToRenderer('save-session-context', {
             sessionId: currentSessionId,
             profile: profile,
-            customPrompt: customPrompt || ''
+            customPrompt: customPrompt || '',
         });
     }
 }
@@ -93,13 +101,13 @@ function saveConversationTurn(transcription, aiResponse) {
 
     const conversationTurn = {
         timestamp: Date.now(),
-        transcription: transcription.trim(),
-        ai_response: aiResponse.trim(),
+        transcription: (transcription || '').trim(),
+        ai_response: (aiResponse || '').trim(),
     };
 
     conversationHistory.push(conversationTurn);
 
-    // Send to renderer to save in IndexedDB
+    // Send to renderer to save in IndexedDB/Storage
     sendToRenderer('save-conversation-turn', {
         sessionId: currentSessionId,
         turn: conversationTurn,
@@ -115,8 +123,8 @@ function saveScreenAnalysis(prompt, response, model) {
     const analysisEntry = {
         timestamp: Date.now(),
         prompt: prompt,
-        response: response.trim(),
-        model: model
+        response: (response || '').trim(),
+        model: model,
     };
 
     screenAnalysisHistory.push(analysisEntry);
@@ -127,7 +135,7 @@ function saveScreenAnalysis(prompt, response, model) {
         analysis: analysisEntry,
         fullHistory: screenAnalysisHistory,
         profile: currentProfile,
-        customPrompt: currentCustomPrompt
+        customPrompt: currentCustomPrompt,
     });
 }
 
@@ -144,16 +152,10 @@ function getCurrentSessionId() {
 
 async function getEnabledTools() {
     const tools = [];
-
-    // Check if Google Search is enabled (default: true)
     const googleSearchEnabled = await getStoredSetting('googleSearchEnabled', 'true');
-    console.log('Google Search enabled:', googleSearchEnabled);
 
     if (googleSearchEnabled === 'true') {
         tools.push({ googleSearch: {} });
-        console.log('Added Google Search tool');
-    } else {
-        console.log('Google Search tool disabled');
     }
 
     return tools;
@@ -163,22 +165,13 @@ async function getStoredSetting(key, defaultValue) {
     try {
         const windows = BrowserWindow.getAllWindows();
         if (windows.length > 0) {
-            // Wait a bit for the renderer to be ready
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            // Try to get setting from renderer process localStorage
+            await new Promise(resolve => setTimeout(resolve, 50));
             const value = await windows[0].webContents.executeJavaScript(`
                 (function() {
                     try {
-                        if (typeof localStorage === 'undefined') {
-                            console.log('localStorage not available yet for ${key}');
-                            return '${defaultValue}';
-                        }
-                        const stored = localStorage.getItem('${key}');
-                        console.log('Retrieved setting ${key}:', stored);
-                        return stored || '${defaultValue}';
+                        if (typeof localStorage === 'undefined') return '${defaultValue}';
+                        return localStorage.getItem('${key}') || '${defaultValue}';
                     } catch (e) {
-                        console.error('Error accessing localStorage for ${key}:', e);
                         return '${defaultValue}';
                     }
                 })()
@@ -186,26 +179,95 @@ async function getStoredSetting(key, defaultValue) {
             return value;
         }
     } catch (error) {
-        console.error('Error getting stored setting for', key, ':', error.message);
+        // Fallback to default
     }
-    console.log('Using default value for', key, ':', defaultValue);
     return defaultValue;
 }
 
+let isGeminiGenerating = false;
+
+async function geminiStreamAnswer(question, systemPrompt) {
+    if (!question || typeof question !== 'string' || question.trim().length === 0) return;
+    if (isGeminiGenerating) return;
+
+    const apiKey = getApiKey();
+    if (!apiKey) return;
+
+    isGeminiGenerating = true;
+    const cleanQuestion = question.trim();
+
+    PromptLogger.logPayloadSentToAI({
+        systemPrompt,
+        conversationHistory,
+        question: cleanQuestion,
+    });
+
+    sendToRenderer('update-status', 'Thinking...');
+
+    try {
+        const client = new GoogleGenAI({ apiKey: apiKey });
+
+        const chatContents = [];
+        for (const turn of conversationHistory.slice(-10)) {
+            if (turn.transcription && turn.ai_response) {
+                chatContents.push({ role: 'user', parts: [{ text: turn.transcription }] });
+                chatContents.push({ role: 'model', parts: [{ text: turn.ai_response }] });
+            }
+        }
+        chatContents.push({ role: 'user', parts: [{ text: cleanQuestion }] });
+
+        const responseStream = await client.models.generateContentStream({
+            model: 'gemini-2.5-flash',
+            contents: chatContents,
+            config: {
+                systemInstruction: systemPrompt,
+                temperature: 0.6,
+            },
+        });
+
+        let fullText = '';
+        let isFirst = true;
+        let lastSendTime = Date.now();
+
+        for await (const chunk of responseStream) {
+            const token = chunk.text || '';
+            if (token) {
+                fullText += token;
+                const now = Date.now();
+                if (isFirst || now - lastSendTime > 60) {
+                    sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
+                    isFirst = false;
+                    lastSendTime = now;
+                }
+            }
+        }
+
+        if (fullText.trim().length > 0) {
+            console.log(`[VOICE LOG] [AI RESPONSE]:\n${fullText}`);
+            sendToRenderer('update-response', fullText);
+            saveConversationTurn(cleanQuestion, fullText);
+        }
+
+        sendToRenderer('update-status', 'Listening...');
+    } catch (err) {
+        console.error('Gemini stream generation error:', err.message);
+        sendToRenderer('update-status', 'Error generating response');
+    } finally {
+        isGeminiGenerating = false;
+    }
+}
+
 async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', isReconnect = false) {
-    if (isInitializingSession) {
-        console.log('Session initialization already in progress');
-        return false;
+    if (isInitializingSession && !isReconnect) {
+        console.log('Session already initializing, skipping...');
+        return null;
     }
 
     isInitializingSession = true;
-    if (!isReconnect) {
-        sendToRenderer('session-initializing', true);
-    }
+    isUserClosing = false;
+    sessionParams = { apiKey, customPrompt, profile, language };
 
-    // Store params for reconnection
     if (!isReconnect) {
-        sessionParams = { apiKey, customPrompt, profile, language };
         reconnectAttempts = 0;
     }
 
@@ -215,100 +277,121 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
         httpOptions: { apiVersion: 'v1alpha' },
     });
 
-    // Get enabled tools first to determine Google Search status
     const enabledTools = await getEnabledTools();
     const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch);
+    const prefs = getPreferences();
+    const systemPrompt = getSystemPrompt(
+        profile,
+        customPrompt,
+        googleSearchEnabled,
+        prefs.systemInstruction || '',
+        prefs.developerInstruction || '',
+        prefs.fullSystemPrompt || ''
+    );
 
-    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
-
-    // Initialize new conversation session only on first connect
     if (!isReconnect) {
         initializeNewSession(profile, customPrompt);
     }
 
+    const liveModel = 'gemini-2.5-flash-native-audio-latest';
+
+    pendingSpeechTranscript = '';
+    if (speechDebounceTimer) {
+        clearTimeout(speechDebounceTimer);
+        speechDebounceTimer = null;
+    }
+
     try {
         const session = await client.live.connect({
-            model: 'gemini-2.5-flash-native-audio-latest',
+            model: liveModel,
             callbacks: {
                 onopen: function () {
+                    console.log('[VOICE LOG] [TURN START] (Listening...)');
                     sendToRenderer('update-status', 'Live session connected');
                 },
-                onmessage: function (message) {
-                    console.log('----------------', message);
+                onmessage: async function (message) {
+                    const groqKey = getGroqApiKey();
+                    const prefs = getPreferences();
+                    const useGroq = Boolean(prefs.aiProvider === 'groq' && groqKey && groqKey.trim() !== '');
 
-                    // Debug: Log all response fields
-                    if (message.serverContent) {
-                        console.log('serverContent keys:', Object.keys(message.serverContent));
-                    }
-
-                    // Handle input transcription (what was spoken)
+                    // 1. Handle input transcription (what was spoken & diarized)
+                    let newTranscript = '';
                     if (message.serverContent?.inputTranscription?.results) {
-                        currentTranscription += formatSpeakerResults(message.serverContent.inputTranscription.results);
+                        newTranscript = formatSpeakerResults(message.serverContent.inputTranscription.results);
+                        currentTranscription += newTranscript;
+                        pendingSpeechTranscript += newTranscript;
                     } else if (message.serverContent?.inputTranscription?.text) {
                         const text = message.serverContent.inputTranscription.text;
                         if (text.trim() !== '') {
+                            newTranscript = text;
                             currentTranscription += text;
+                            pendingSpeechTranscript += text;
                         }
                     }
 
-                    // Handle AI model response via output transcription (native audio model)
-                    if (message.serverContent?.outputTranscription?.text) {
-                        const text = message.serverContent.outputTranscription.text;
-                        console.log('Output transcription text:', text);
-                        if (text.trim() === '') return; // Ignore empty transcriptions
-                        const isNewResponse = messageBuffer === '';
-                        messageBuffer += text;
-                        sendToRenderer(isNewResponse ? 'new-response' : 'update-response', messageBuffer);
+                    if (newTranscript && newTranscript.trim() !== '') {
+                        sendToRenderer('update-status', `🎙️ Heard: "${newTranscript.trim().slice(0, 40)}"`);
                     }
 
-                    // Handle text responses via modelTurn.parts (for text-based responses)
-                    if (message.serverContent?.modelTurn?.parts) {
-                        for (const part of message.serverContent.modelTurn.parts) {
-                            if (part.text && !part.thought) {
-                                const isNewResponse = messageBuffer === '';
-                                messageBuffer += part.text;
-                                sendToRenderer(isNewResponse ? 'new-response' : 'update-response', messageBuffer);
-                            }
-                            // Check for inline audio data (the model's spoken response)
-                            if (part.inlineData?.mimeType?.includes('audio')) {
-                                console.log('Received audio response data:', part.inlineData.mimeType);
-                            }
+                    // 2. Debounced AI answering (Groq or Gemini)
+                    if (newTranscript && newTranscript.trim() !== '') {
+                        if (speechDebounceTimer) {
+                            clearTimeout(speechDebounceTimer);
+                            speechDebounceTimer = null;
                         }
-                    }
 
-                    if (message.serverContent?.generationComplete) {
-                        // Only send/save if there's actual content
-                        if (messageBuffer.trim() !== '') {
-                            sendToRenderer('update-response', messageBuffer);
+                        const trimmed = pendingSpeechTranscript.trim();
+                        const hasPunctuationEnd = /[.?!]\s*$/.test(trimmed);
+                        const debounceDelay = hasPunctuationEnd ? 350 : 900;
 
-                            // Save conversation turn when we have both transcription and AI response
-                            if (currentTranscription) {
-                                saveConversationTurn(currentTranscription, messageBuffer);
-                                currentTranscription = ''; // Reset for next turn
+                        speechDebounceTimer = setTimeout(() => {
+                            if (pendingSpeechTranscript.trim().length > 3) {
+                                const questionToAnswer = pendingSpeechTranscript.trim();
+                                pendingSpeechTranscript = '';
+                                sendToRenderer('update-status', 'Thinking...');
+                                if (useGroq) {
+                                    groqAI.generateAnswer(questionToAnswer, systemPrompt);
+                                } else {
+                                    geminiStreamAnswer(questionToAnswer, systemPrompt);
+                                }
                             }
-                        }
-                        messageBuffer = '';
+                        }, debounceDelay);
                     }
 
+                    // 3. Turn Complete
                     if (message.serverContent?.turnComplete) {
+                        if (pendingSpeechTranscript.trim().length > 3) {
+                            if (speechDebounceTimer) {
+                                clearTimeout(speechDebounceTimer);
+                                speechDebounceTimer = null;
+                            }
+                            const questionToAnswer = pendingSpeechTranscript.trim();
+                            pendingSpeechTranscript = '';
+                            sendToRenderer('update-status', 'Thinking...');
+                            if (useGroq) {
+                                groqAI.generateAnswer(questionToAnswer, systemPrompt);
+                            } else {
+                                geminiStreamAnswer(questionToAnswer, systemPrompt);
+                            }
+                        }
+                        currentTranscription = '';
+                        messageBuffer = '';
                         sendToRenderer('update-status', 'Listening...');
+                        console.log('[VOICE LOG] [TURN COMPLETE] (Ready for next question)');
                     }
                 },
                 onerror: function (e) {
-                    console.log('Session error:', e.message);
+                    console.error('Session error:', e.message);
                     sendToRenderer('update-status', 'Error: ' + e.message);
                 },
                 onclose: function (e) {
-                    console.log('Session closed:', e.reason);
-
-                    // Don't reconnect if user intentionally closed
                     if (isUserClosing) {
                         isUserClosing = false;
                         sendToRenderer('update-status', 'Session closed');
                         return;
                     }
 
-                    // Attempt reconnection
+                    // Auto-reconnect if session closed unexpectedly
                     if (sessionParams && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                         attemptReconnect();
                     } else {
@@ -320,7 +403,6 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                 responseModalities: [Modality.AUDIO],
                 outputAudioTranscription: {},
                 tools: enabledTools,
-                // Enable speaker diarization
                 inputAudioTranscription: {
                     enableSpeakerDiarization: true,
                     minSpeakerCount: 2,
@@ -353,13 +435,10 @@ async function attemptReconnect() {
     reconnectAttempts++;
     console.log(`Reconnection attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`);
 
-    // Clear stale buffers
     messageBuffer = '';
     currentTranscription = '';
 
     sendToRenderer('update-status', `Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
-
-    // Wait before attempting
     await new Promise(resolve => setTimeout(resolve, RECONNECT_DELAY));
 
     try {
@@ -368,13 +447,12 @@ async function attemptReconnect() {
             sessionParams.customPrompt,
             sessionParams.profile,
             sessionParams.language,
-            true // isReconnect
+            true
         );
 
         if (session && global.geminiSessionRef) {
             global.geminiSessionRef.current = session;
 
-            // Restore context from conversation history via text message
             const contextMessage = buildContextMessage();
             if (contextMessage) {
                 try {
@@ -382,11 +460,10 @@ async function attemptReconnect() {
                     await session.sendRealtimeInput({ text: contextMessage });
                 } catch (contextError) {
                     console.error('Failed to restore context:', contextError);
-                    // Continue without context - better than failing
                 }
             }
 
-            // Don't reset reconnectAttempts here - let it reset on next fresh session
+            reconnectAttempts = 0;
             sendToRenderer('update-status', 'Reconnected! Listening...');
             console.log('Session reconnected successfully');
             return true;
@@ -395,15 +472,13 @@ async function attemptReconnect() {
         console.error(`Reconnection attempt ${reconnectAttempts} failed:`, error);
     }
 
-    // If we still have attempts left, try again
     if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
         return attemptReconnect();
     }
 
-    // Max attempts reached - notify frontend
     console.log('Max reconnection attempts reached');
     sendToRenderer('reconnect-failed', {
-        message: 'Tried 3 times to reconnect. Must be upstream/network issues. Try restarting or download updated app from site.',
+        message: 'Could not reconnect to live audio session. Please check your internet connection or restart the session.',
     });
     sessionParams = null;
     return false;
@@ -411,30 +486,17 @@ async function attemptReconnect() {
 
 function killExistingSystemAudioDump() {
     return new Promise(resolve => {
-        console.log('Checking for existing SystemAudioDump processes...');
-
-        // Kill any existing SystemAudioDump processes
         const killProc = spawn('pkill', ['-f', 'SystemAudioDump'], {
             stdio: 'ignore',
         });
 
-        killProc.on('close', code => {
-            if (code === 0) {
-                console.log('Killed existing SystemAudioDump processes');
-            } else {
-                console.log('No existing SystemAudioDump processes found');
-            }
-            resolve();
-        });
+        killProc.on('close', () => resolve());
+        killProc.on('error', () => resolve());
 
-        killProc.on('error', err => {
-            console.log('Error checking for existing processes (this is normal):', err.message);
-            resolve();
-        });
-
-        // Timeout after 2 seconds
         setTimeout(() => {
-            killProc.kill();
+            try {
+                killProc.kill();
+            } catch (e) {}
             resolve();
         }, 2000);
     });
@@ -443,28 +505,16 @@ function killExistingSystemAudioDump() {
 async function startMacOSAudioCapture(geminiSessionRef) {
     if (process.platform !== 'darwin') return false;
 
-    // Kill any existing SystemAudioDump processes first
     await killExistingSystemAudioDump();
-
-    console.log('Starting macOS audio capture with SystemAudioDump...');
 
     const { app } = require('electron');
     const path = require('path');
 
-    let systemAudioPath;
-    if (app.isPackaged) {
-        systemAudioPath = path.join(process.resourcesPath, 'SystemAudioDump');
-    } else {
-        systemAudioPath = path.join(__dirname, '../assets', 'SystemAudioDump');
-    }
-
-    console.log('SystemAudioDump path:', systemAudioPath);
+    let systemAudioPath = app.isPackaged ? path.join(process.resourcesPath, 'SystemAudioDump') : path.join(__dirname, '../assets', 'SystemAudioDump');
 
     const spawnOptions = {
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: {
-            ...process.env,
-        },
+        env: { ...process.env },
     };
 
     systemAudioProc = spawn(systemAudioPath, [], spawnOptions);
@@ -473,8 +523,6 @@ async function startMacOSAudioCapture(geminiSessionRef) {
         console.error('Failed to start SystemAudioDump');
         return false;
     }
-
-    console.log('SystemAudioDump started with PID:', systemAudioProc.pid);
 
     const CHUNK_DURATION = 0.1;
     const SAMPLE_RATE = 24000;
@@ -496,7 +544,6 @@ async function startMacOSAudioCapture(geminiSessionRef) {
             sendAudioToGemini(base64Data, geminiSessionRef);
 
             if (process.env.DEBUG_AUDIO) {
-                console.log(`Processed audio chunk: ${chunk.length} bytes`);
                 saveDebugAudio(monoChunk, 'system_audio');
             }
         }
@@ -511,44 +558,28 @@ async function startMacOSAudioCapture(geminiSessionRef) {
         console.error('SystemAudioDump stderr:', data.toString());
     });
 
-    systemAudioProc.on('close', code => {
-        console.log('SystemAudioDump process closed with code:', code);
+    systemAudioProc.on('close', () => {
         systemAudioProc = null;
     });
 
-    systemAudioProc.on('error', err => {
-        console.error('SystemAudioDump process error:', err);
+    systemAudioProc.on('error', () => {
         systemAudioProc = null;
     });
 
     return true;
 }
 
-function convertStereoToMono(stereoBuffer) {
-    const samples = stereoBuffer.length / 4;
-    const monoBuffer = Buffer.alloc(samples * 2);
-
-    for (let i = 0; i < samples; i++) {
-        const leftSample = stereoBuffer.readInt16LE(i * 4);
-        monoBuffer.writeInt16LE(leftSample, i * 2);
-    }
-
-    return monoBuffer;
-}
-
 function stopMacOSAudioCapture() {
     if (systemAudioProc) {
-        console.log('Stopping SystemAudioDump...');
         systemAudioProc.kill('SIGTERM');
         systemAudioProc = null;
     }
 }
 
 async function sendAudioToGemini(base64Data, geminiSessionRef) {
-    if (!geminiSessionRef.current) return;
+    if (!geminiSessionRef?.current) return;
 
     try {
-        process.stdout.write('.');
         await geminiSessionRef.current.sendRealtimeInput({
             audio: {
                 data: base64Data,
@@ -561,115 +592,142 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
 }
 
 async function sendImageToGeminiHttp(base64Data, prompt) {
-    // Get available model based on rate limits
-    const model = getAvailableModel();
-
     const apiKey = getApiKey();
     if (!apiKey) {
-        return { success: false, error: 'No API key configured' };
+        return { success: false, error: 'Gemini API key is required' };
     }
 
+    sendToRenderer('update-status', 'Analyzing image with Gemini...');
+    sendToRenderer('new-response', 'Analyzing image...\n\n');
+
     try {
-        const ai = new GoogleGenAI({ apiKey: apiKey });
+        const client = new GoogleGenAI({ apiKey });
+        const prefs = getPreferences();
+        const systemPrompt = getSystemPrompt(
+            prefs.profile || 'interview',
+            prefs.customPrompt || '',
+            prefs.googleSearchEnabled !== 'false',
+            prefs.systemInstruction || '',
+            prefs.developerInstruction || '',
+            prefs.fullSystemPrompt || ''
+        );
 
-        const contents = [
-            {
-                inlineData: {
-                    mimeType: 'image/jpeg',
-                    data: base64Data,
+        console.log('\n[SCREENSHOT] GEMINI VISION ANALYSIS');
+        console.log('======================== [PAYLOAD SENT TO AI] ========================');
+        console.log('[SYSTEM PROMPT]:\n' + systemPrompt);
+        console.log('---------------------------------------------------------------------');
+        console.log(`[USER PROMPT]: "${prompt}"`);
+        console.log('=====================================================================');
+
+        const responseStream = await client.models.generateContentStream({
+            model: 'gemini-2.5-flash',
+            contents: [
+                {
+                    role: 'user',
+                    parts: [
+                        {
+                            inlineData: {
+                                mimeType: 'image/jpeg',
+                                data: base64Data,
+                            },
+                        },
+                        {
+                            text: prompt || 'Analyze this screenshot and provide the complete answer/code.',
+                        },
+                    ],
                 },
+            ],
+            config: {
+                systemInstruction: systemPrompt,
+                temperature: 0.2,
             },
-            { text: prompt },
-        ];
-
-        console.log('\n[SCREENSHOT] PROMPT SENT TO AI:');
-        console.log('-'.repeat(70));
-        console.log(prompt);
-        console.log('-'.repeat(70) + '\n');
-        const response = await ai.models.generateContentStream({
-            model: model,
-            contents: contents,
         });
 
-        // Increment count after successful call
-        incrementLimitCount(model);
-
-        // Stream the response
         let fullText = '';
         let isFirst = true;
-        for await (const chunk of response) {
-            const chunkText = chunk.text;
-            if (chunkText) {
-                fullText += chunkText;
-                // Send to renderer - new response for first chunk, update for subsequent
-                sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
-                isFirst = false;
-            }
-        }
+        let lastSendTime = Date.now();
 
-        // Image response received
-
-        // Save screen analysis to history
-        saveScreenAnalysis(prompt, fullText, model);
-
-        // Save screenshot image to disk with AI response
-        try {
-            const sessionId = getCurrentSessionId();
-            if (sessionId) {
-                const storage = require('../storage');
-                const result = storage.saveSessionScreenshot(base64Data, sessionId, fullText);
-                if (result.success) {
-                    // Screenshot saved
-                } else {
-                    console.warn(`⚠️ Could not save screenshot image: ${result.error}`);
+        for await (const chunk of responseStream) {
+            const token = chunk.text || '';
+            if (token) {
+                fullText += token;
+                const now = Date.now();
+                if (isFirst || now - lastSendTime > 60) {
+                    sendToRenderer(isFirst ? 'new-response' : 'update-response', fullText);
+                    isFirst = false;
+                    lastSendTime = now;
                 }
             }
-        } catch (e) {
-            console.error('❌ Could not save screenshot image:', e.message);
         }
 
-        return { success: true, text: fullText, model: model };
-    } catch (error) {
-        console.error('Error sending image to Gemini HTTP:', error);
-        sendToRenderer('new-response', `Error: ${error.message}`);
-        return { success: false, error: error.message };
+        if (fullText.trim().length > 0) {
+            console.log(`[SCREENSHOT] [AI RESPONSE]:\n${fullText}`);
+            sendToRenderer('update-response', fullText);
+            saveScreenAnalysis(prompt, fullText, 'gemini-2.5-flash');
+            saveConversationTurn('Screen Analysis', fullText);
+        }
+
+        sendToRenderer('update-status', 'Listening...');
+        return { success: true, text: fullText, model: 'gemini-2.5-flash' };
+    } catch (err) {
+        console.error('Gemini image analysis error:', err.message);
+        sendToRenderer('new-response', `Error analyzing image: ${err.message}`);
+        return { success: false, error: err.message };
     }
 }
 
 function setupGeminiIpcHandlers(geminiSessionRef) {
-    // Store the geminiSessionRef globally for reconnection access
     global.geminiSessionRef = geminiSessionRef;
 
     ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US') => {
-        // Check which AI provider is selected
         const { getPreferences } = require('../storage');
         const prefs = getPreferences();
         const provider = prefs.aiProvider || 'gemini';
 
-        console.log('initialize-gemini called with provider:', provider);
+        console.log(`[Init] initialize-gemini called (provider: ${provider})`);
 
-        if (provider === 'groq') {
-            // For Groq, we don't need a WebSocket session - just initialize the session tracking
-            console.log('Initializing Groq session (HTTP-based)');
-            initializeNewSession(profile, customPrompt);
-            return true;
-        } else {
-            // For Gemini, create the realtime session
+        if (apiKey) {
             const session = await initializeGeminiSession(apiKey, customPrompt, profile, language);
             if (session) {
                 geminiSessionRef.current = session;
                 return true;
             }
             return false;
+        } else {
+            initializeNewSession(profile, customPrompt);
+            return true;
         }
+    });
+
+    const handleAudioChunk = (data, mimeType) => {
+        if (!data || !geminiSessionRef.current) return;
+        try {
+            const res = geminiSessionRef.current.sendRealtimeInput({
+                audio: { data: data, mimeType: mimeType || 'audio/pcm;rate=24000' },
+            });
+            if (res && typeof res.catch === 'function') {
+                res.catch(error => {
+                    console.error('Error sending audio chunk to Gemini:', error.message);
+                });
+            }
+        } catch (error) {
+            console.error('Error in handleAudioChunk:', error.message);
+        }
+    };
+
+    ipcMain.on('send-audio-content', (event, { data, mimeType }) => {
+        handleAudioChunk(data, mimeType);
+    });
+
+    ipcMain.on('send-mic-audio-content', (event, { data, mimeType }) => {
+        handleAudioChunk(data, mimeType);
     });
 
     ipcMain.handle('send-audio-content', async (event, { data, mimeType }) => {
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
         try {
-            process.stdout.write('.');
             await geminiSessionRef.current.sendRealtimeInput({
-                audio: { data: data, mimeType: mimeType },
+                audio: { data: data, mimeType: mimeType || 'audio/pcm;rate=24000' },
             });
             return { success: true };
         } catch (error) {
@@ -678,13 +736,11 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
-    // Handle microphone audio on a separate channel
     ipcMain.handle('send-mic-audio-content', async (event, { data, mimeType }) => {
         if (!geminiSessionRef.current) return { success: false, error: 'No active Gemini session' };
         try {
-            process.stdout.write(',');
             await geminiSessionRef.current.sendRealtimeInput({
-                audio: { data: data, mimeType: mimeType },
+                audio: { data: data, mimeType: mimeType || 'audio/pcm;rate=24000' },
             });
             return { success: true };
         } catch (error) {
@@ -696,34 +752,18 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     ipcMain.handle('send-image-content', async (event, { data, prompt }) => {
         try {
             if (!data || typeof data !== 'string') {
-                console.error('Invalid image data received');
                 return { success: false, error: 'Invalid image data' };
             }
 
-            const buffer = Buffer.from(data, 'base64');
-
-            if (buffer.length < 1000) {
-                console.error(`Image buffer too small: ${buffer.length} bytes`);
-                return { success: false, error: 'Image buffer too small' };
-            }
-
-            process.stdout.write('!');
-
-            // Check which AI provider is selected
-            const { getPreferences } = require('../storage');
+            const { getPreferences, getGroqApiKey } = require('../storage');
             const prefs = getPreferences();
+            const groqKey = getGroqApiKey();
             const provider = prefs.aiProvider || 'gemini';
 
-            if (provider === 'groq') {
-                // Use Groq for image analysis
-                console.log('Using Groq provider for image analysis');
-                const { groqAI } = require('./groq');
-                const result = await groqAI.analyzeScreenshot(data, prompt);
-                return result;
+            if (provider === 'groq' && groqKey) {
+                return await groqAI.analyzeScreenshot(data, prompt);
             } else {
-                // Use Gemini (default)
-                const result = await sendImageToGeminiHttp(data, prompt);
-                return result;
+                return await sendImageToGeminiHttp(data, prompt);
             }
         } catch (error) {
             console.error('Error sending image:', error);
@@ -737,25 +777,30 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: false, error: 'Invalid text message' };
             }
 
-            // Check which AI provider is selected
-            const { getPreferences } = require('../storage');
+            const { getPreferences, getGroqApiKey } = require('../storage');
             const prefs = getPreferences();
+            const groqKey = getGroqApiKey();
             const provider = prefs.aiProvider || 'gemini';
 
-            console.log('Sending text message:', text, '| Provider:', provider);
+            const googleSearchEnabled = prefs.googleSearchEnabled !== 'false';
+            const systemPrompt = getSystemPrompt(
+                prefs.profile || 'interview',
+                prefs.customPrompt || '',
+                googleSearchEnabled,
+                prefs.systemInstruction || '',
+                prefs.developerInstruction || '',
+                prefs.fullSystemPrompt || ''
+            );
 
-            if (provider === 'groq') {
-                // Use Groq for text messages (streaming HTTP)
-                const { groqAI } = require('./groq');
-                
-                // Construct system prompt including custom instructions
-                const googleSearchEnabled = prefs.googleSearchEnabled !== 'false';
-                const systemPrompt = getSystemPrompt(prefs.profile || 'interview', prefs.customPrompt || '', googleSearchEnabled);
-                
-                const result = await groqAI.sendTextMessage(text.trim(), systemPrompt);
-                return result;
+            PromptLogger.logPayloadSentToAI({
+                systemPrompt,
+                conversationHistory,
+                question: text.trim(),
+            });
+
+            if (provider === 'groq' && groqKey) {
+                return await groqAI.sendTextMessage(text.trim(), systemPrompt);
             } else {
-                // Use Gemini realtime session
                 if (!geminiSessionRef.current) {
                     return { success: false, error: 'No active Gemini session' };
                 }
@@ -768,14 +813,45 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
-    ipcMain.handle('start-macos-audio', async event => {
-        if (process.platform !== 'darwin') {
-            return {
-                success: false,
-                error: 'macOS audio capture only available on macOS',
-            };
+    ipcMain.handle('force-trigger-answer', async () => {
+        console.log('[VOICE LOG] [SHORTCUT] Force trigger answer immediately');
+        const groqKey = getGroqApiKey();
+        const prefs = getPreferences();
+        const useGroq = Boolean(prefs.aiProvider === 'groq' && groqKey && groqKey.trim() !== '');
+
+        if (speechDebounceTimer) {
+            clearTimeout(speechDebounceTimer);
+            speechDebounceTimer = null;
         }
 
+        const question = (pendingSpeechTranscript || currentTranscription || '').trim();
+        if (question.length > 0) {
+            pendingSpeechTranscript = '';
+            sendToRenderer('update-status', '⚡ Analyzing...');
+            const googleSearchEnabled = prefs.googleSearchEnabled !== 'false';
+            const systemPrompt = getSystemPrompt(
+                prefs.profile || 'interview',
+                prefs.customPrompt || '',
+                googleSearchEnabled,
+                prefs.systemInstruction || '',
+                prefs.developerInstruction || '',
+                prefs.fullSystemPrompt || ''
+            );
+
+            if (useGroq) {
+                return await groqAI.generateAnswer(question, systemPrompt);
+            } else {
+                return await geminiStreamAnswer(question, systemPrompt);
+            }
+        }
+        sendToRenderer('update-status', '⚠️ No speech heard yet');
+        return { success: false, error: 'No transcription captured yet' };
+    });
+
+    ipcMain.handle('start-macos-audio', async () => {
+        if (process.platform !== 'darwin') {
+            return { success: false, error: 'macOS audio capture only available on macOS' };
+        }
         try {
             const success = await startMacOSAudioCapture(geminiSessionRef);
             return { success };
@@ -785,25 +861,21 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
-    ipcMain.handle('stop-macos-audio', async event => {
+    ipcMain.handle('stop-macos-audio', async () => {
         try {
             stopMacOSAudioCapture();
             return { success: true };
         } catch (error) {
-            console.error('Error stopping macOS audio capture:', error);
             return { success: false, error: error.message };
         }
     });
 
-    ipcMain.handle('close-session', async event => {
+    ipcMain.handle('close-session', async () => {
         try {
             stopMacOSAudioCapture();
-
-            // Set flag to prevent reconnection attempts
             isUserClosing = true;
             sessionParams = null;
 
-            // Cleanup session
             if (geminiSessionRef.current) {
                 await geminiSessionRef.current.close();
                 geminiSessionRef.current = null;
@@ -816,36 +888,25 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
-    // Conversation history IPC handlers
-    ipcMain.handle('get-current-session', async event => {
+    ipcMain.handle('get-current-session', async () => {
         try {
             return { success: true, data: getCurrentSessionData() };
         } catch (error) {
-            console.error('Error getting current session:', error);
             return { success: false, error: error.message };
         }
     });
 
-    ipcMain.handle('start-new-session', async event => {
+    ipcMain.handle('start-new-session', async () => {
         try {
             initializeNewSession();
             return { success: true, sessionId: currentSessionId };
         } catch (error) {
-            console.error('Error starting new session:', error);
             return { success: false, error: error.message };
         }
     });
 
     ipcMain.handle('update-google-search-setting', async (event, enabled) => {
-        try {
-            console.log('Google Search setting updated to:', enabled);
-            // The setting is already saved in localStorage by the renderer
-            // This is just for logging/confirmation
-            return { success: true };
-        } catch (error) {
-            console.error('Error updating Google Search setting:', error);
-            return { success: false, error: error.message };
-        }
+        return { success: true };
     });
 }
 

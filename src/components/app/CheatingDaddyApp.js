@@ -14,7 +14,11 @@ export class CheatingDaddyApp extends LitElement {
     static styles = css`
         * {
             box-sizing: border-box;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family:
+                'Inter',
+                -apple-system,
+                BlinkMacSystemFont,
+                sans-serif;
             margin: 0px;
             padding: 0px;
             cursor: default;
@@ -149,7 +153,7 @@ export class CheatingDaddyApp extends LitElement {
         this._currentResponseIsComplete = true;
         this.shouldAnimateResponse = false;
         this._storageLoaded = false;
-        
+
         // Invigilator Mode defaults
         this.invigilatorModeActive = false;
         this.invigilatorTypingMode = 'charByChar';
@@ -157,17 +161,14 @@ export class CheatingDaddyApp extends LitElement {
 
         // Load from storage
         this._loadFromStorage();
-        
+
         // Subscribe to invigilator mode events
         this._setupInvigilatorModeListeners();
     }
 
     async _loadFromStorage() {
         try {
-            const [config, prefs] = await Promise.all([
-                cheatingDaddy.storage.getConfig(),
-                cheatingDaddy.storage.getPreferences()
-            ]);
+            const [config, prefs] = await Promise.all([cheatingDaddy.storage.getConfig(), cheatingDaddy.storage.getPreferences()]);
 
             // Check onboarding status
             this.currentView = config.onboarded ? 'main' : 'onboarding';
@@ -175,10 +176,7 @@ export class CheatingDaddyApp extends LitElement {
             // Apply background appearance (color + transparency)
             const transparency = prefs.backgroundTransparency ?? 0.8;
             this.backgroundTransparency = transparency;
-            this.applyBackgroundAppearance(
-                prefs.backgroundColor ?? '#1e1e1e',
-                transparency
-            );
+            this.applyBackgroundAppearance(prefs.backgroundColor ?? '#1e1e1e', transparency);
 
             // Apply text opacity
             const textOpacity = prefs.textOpacity ?? 1;
@@ -215,20 +213,20 @@ export class CheatingDaddyApp extends LitElement {
         invigilatorMode.onModeToggle(({ isActive }) => {
             this.invigilatorModeActive = isActive;
             console.log(`[App] Invigilator Mode: ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
-            
+
             // Hide or show window based on mode
             if (isActive) {
                 this._hideWindow();
             }
-            
+
             this.requestUpdate();
         });
-        
+
         // Subscribe to typing mode changes
         invigilatorMode.onTypingModeChange(({ typingMode }) => {
             this.invigilatorTypingMode = typingMode;
             console.log(`[App] Typing Mode: ${typingMode}`);
-            
+
             // Save preference to storage
             if (window.require) {
                 try {
@@ -239,10 +237,10 @@ export class CheatingDaddyApp extends LitElement {
                     console.warn('[App] Failed to save invigilator preference:', error);
                 }
             }
-            
+
             this.requestUpdate();
         });
-        
+
         // Subscribe to preview show events (preview removed, just log)
         invigilatorMode.onPreviewShow(({ code }) => {
             console.log(`[App] Answer captured (${code.length} chars), ready for auto-type`);
@@ -273,21 +271,22 @@ export class CheatingDaddyApp extends LitElement {
         }
     }
 
-
     hexToRgb(hex) {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-            r: parseInt(result[1], 16),
-            g: parseInt(result[2], 16),
-            b: parseInt(result[3], 16)
-        } : { r: 30, g: 30, b: 30 };
+        return result
+            ? {
+                  r: parseInt(result[1], 16),
+                  g: parseInt(result[2], 16),
+                  b: parseInt(result[3], 16),
+              }
+            : { r: 30, g: 30, b: 30 };
     }
 
     lightenColor(rgb, amount) {
         return {
             r: Math.min(255, rgb.r + amount),
             g: Math.min(255, rgb.g + amount),
-            b: Math.min(255, rgb.b + amount)
+            b: Math.min(255, rgb.b + amount),
         };
     }
 
@@ -369,30 +368,34 @@ export class CheatingDaddyApp extends LitElement {
                 }
                 this.requestUpdate();
             });
-            
+            ipcRenderer.on('toggle-listen-answer', () => {
+                console.log('[App] Received toggle-listen-answer shortcut');
+                this.handleToggleListenAnswer();
+            });
+
             // ==================== INVIGILATOR MODE IPC LISTENERS ====================
             ipcRenderer.on('invigilator:toggle-mode', () => {
                 console.log('[App IPC] Received toggle-mode');
                 invigilatorMode.toggleMode();
             });
-            
+
             ipcRenderer.on('invigilator:capture-answer', () => {
                 console.log('[App IPC] Received capture-answer');
                 // This will be handled by answer capture flow (future task)
                 this._handleAnswerCapture();
             });
-            
+
             ipcRenderer.on('invigilator:confirm-autotype', () => {
                 console.log('[App IPC] Received confirm-autotype');
                 // This will be handled by auto-type execution (future task)
                 this._handleConfirmAutotype();
             });
-            
+
             ipcRenderer.on('invigilator:toggle-typing-mode', () => {
                 console.log('[App IPC] Received toggle-typing-mode');
                 invigilatorMode.toggleTypingMode();
                 this.setStatus(`Typing Mode: ${invigilatorMode.getState().typingMode}`);
-                
+
                 // Clear the status message after a few seconds
                 setTimeout(() => {
                     if (this.statusText && this.statusText.includes('Typing Mode:')) {
@@ -404,7 +407,7 @@ export class CheatingDaddyApp extends LitElement {
             ipcRenderer.on('invigilator:pause-resume-typing', () => {
                 console.log('[App IPC] Received pause-resume-typing');
                 togglePauseTyping();
-                
+
                 // Show status
                 const isPaused = getTypingState().isPaused;
                 this.setStatus(isPaused ? 'Auto-Typing Paused' : 'Auto-Typing Resumed');
@@ -414,7 +417,7 @@ export class CheatingDaddyApp extends LitElement {
                 console.log('[App IPC] Received stop-typing');
                 stopTyping();
             });
-            
+
             // Update invigilator mode state when requested
             ipcRenderer.on('request-invigilator-state', () => {
                 const state = invigilatorMode.getState();
@@ -451,17 +454,17 @@ export class CheatingDaddyApp extends LitElement {
             console.log('[addNewResponse] [Invigilator] Captured answer start:', response.substring(0, 50));
             invigilatorMode.setAnswerCode(response);
             this._showWindow(); // Show window so user can see preview
-            
+
             // Schedule flag clearing after response streaming completes
             clearTimeout(this._invigilatorCaptureTimeout);
             this._invigilatorCaptureTimeout = setTimeout(() => {
                 console.log('[addNewResponse] [Invigilator] Capture complete, clearing flag');
                 window._invigilatorAnswerCapture = false;
             }, 500); // Wait 500ms for all streaming to finish
-            
+
             return;
         }
-        
+
         // Normal response handling
         // Add a new response entry (first word of a new AI response)
         this.responses = [...this.responses, response];
@@ -477,17 +480,17 @@ export class CheatingDaddyApp extends LitElement {
             console.log('[updateCurrentResponse] [Invigilator] Appending answer...');
             // Append to existing answer code
             invigilatorMode.setAnswerCode(response);
-            
+
             // Reset the timeout since we're still receiving data
             clearTimeout(this._invigilatorCaptureTimeout);
             this._invigilatorCaptureTimeout = setTimeout(() => {
                 console.log('[updateCurrentResponse] [Invigilator] Capture complete, clearing flag');
                 window._invigilatorAnswerCapture = false;
             }, 500); // Wait 500ms after last chunk for streaming to finish
-            
+
             return;
         }
-        
+
         // Normal response handling
         // Update the current response in place (streaming subsequent words)
         if (this.responses.length > 0) {
@@ -576,7 +579,7 @@ export class CheatingDaddyApp extends LitElement {
     // Quick Start Groq - start immediately with Groq provider
     async handleQuickStartGroq() {
         console.log('Quick start Groq handler called');
-        
+
         // Check if Groq API key exists
         const groqApiKey = await cheatingDaddy.storage.getGroqApiKey();
         if (!groqApiKey || groqApiKey.trim() === '') {
@@ -597,7 +600,7 @@ export class CheatingDaddyApp extends LitElement {
             const { ipcRenderer } = window.require('electron');
             ipcRenderer.send('ai-provider-changed-notify', 'groq');
         }
-        
+
         // Start the session (same as handleStart but with Groq already selected)
         await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
         cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
@@ -612,11 +615,11 @@ export class CheatingDaddyApp extends LitElement {
     // Quick Stop - stop capture and close session immediately
     async handleQuickStop() {
         console.log('Quick stop handler called');
-        
+
         // If in assistant view, stop capture and close session
         if (this.currentView === 'assistant') {
             cheatingDaddy.stopCapture();
-            
+
             // Close the session
             if (window.require) {
                 const { ipcRenderer } = window.require('electron');
@@ -627,6 +630,21 @@ export class CheatingDaddyApp extends LitElement {
             this.currentView = 'main';
             this.isNavbarHidden = false;
             console.log('Session closed via quick stop');
+        }
+    }
+
+    // Toggle Listen & Answer - Start listening or force immediate answering
+    async handleToggleListenAnswer() {
+        console.log('[App] Toggle Listen & Answer triggered, currentView:', this.currentView, 'isRecording:', this.isRecording);
+        if (this.currentView !== 'assistant' || !this.isRecording) {
+            await this.handleStart();
+            this.setStatus('🎙️ Listening... (Press shortcut to Answer)');
+        } else {
+            if (window.require) {
+                const { ipcRenderer } = window.require('electron');
+                this.setStatus('⚡ Analyzing...');
+                await ipcRenderer.invoke('force-trigger-answer');
+            }
         }
     }
 
@@ -699,7 +717,7 @@ export class CheatingDaddyApp extends LitElement {
     // Invigilator Mode event handlers
     async _handleAnswerCapture() {
         console.log('[App] Answer Capture triggered');
-        
+
         if (!window.require) {
             console.warn('[App] Cannot capture answer: Electron not available');
             return;
@@ -707,21 +725,21 @@ export class CheatingDaddyApp extends LitElement {
 
         try {
             const { ipcRenderer } = window.require('electron');
-            
+
             // If captureManualScreenshot is available, use it with override
             // First hide the app window
             this._hideWindow();
-            
+
             // Wait for window to hide
             await new Promise(resolve => setTimeout(resolve, 150));
-            
+
             // Call captureManualScreenshot if available, otherwise show error
             if (window.captureManualScreenshot && typeof window.captureManualScreenshot === 'function') {
                 console.log('[App] Calling screenshot capture for invigilator mode...');
-                
+
                 // Set a flag so that when the response comes back, we store it as answer code
                 window._invigilatorAnswerCapture = true;
-                
+
                 // Call the existing screenshot function
                 // Response will come through the normal 'new-response' IPC events
                 window.captureManualScreenshot();
@@ -737,7 +755,7 @@ export class CheatingDaddyApp extends LitElement {
 
     async _handleConfirmAutotype() {
         console.log('[App] Confirm Auto-Type triggered');
-        
+
         // If we are already typing, ignore the command to avoid restarting or toggling
         const currentTypingState = getTypingState();
         if (currentTypingState && currentTypingState.isTyping) {
@@ -748,7 +766,7 @@ export class CheatingDaddyApp extends LitElement {
         // Get the captured answer code from invigilator mode state
         let rawAnswer = invigilatorMode.getState().lastAnswerCode;
         const typingMode = invigilatorMode.getState().typingMode || 'charByChar';
-        
+
         if (!rawAnswer) {
             // Fallback to the currently displayed AI response if available
             if (this.responses && this.responses.length > 0 && this.currentResponseIndex >= 0) {
@@ -775,17 +793,17 @@ export class CheatingDaddyApp extends LitElement {
             console.warn('[App] Empty code text');
             return;
         }
-        
+
         try {
             console.log(`[App] Starting auto-type with mode: ${typingMode} (${answerCode.length} chars)`);
             this.setStatus(`Typing (${typingMode})...`);
-            
+
             // Get keyboard control object
             const keyboard = getKeyboardControl();
-            
+
             // Create autotyper instance
             const autotyper = createAutotyper(keyboard);
-            
+
             // Execute typing based on mode
             if (typingMode === 'charByChar') {
                 console.log('[App] Using char-by-char typing mode');
@@ -803,7 +821,7 @@ export class CheatingDaddyApp extends LitElement {
                 console.warn(`[App] Unknown typing mode: ${typingMode}, defaulting to char-by-char`);
                 await autotyper.typeCharByChar(answerCode);
             }
-            
+
             console.log('[App] Auto-typing completed successfully');
             this.setStatus('Typing complete');
             setTimeout(() => this.setStatus('Ready'), 3000);
@@ -899,11 +917,11 @@ export class CheatingDaddyApp extends LitElement {
                         .backgroundTransparency=${this.backgroundTransparency}
                         @response-index-changed=${this.handleResponseIndexChanged}
                         @response-animation-complete=${() => {
-                        this.shouldAnimateResponse = false;
-                        this._currentResponseIsComplete = true;
-                        console.log('[response-animation-complete] Marked current response as complete');
-                        this.requestUpdate();
-                    }}
+                            this.shouldAnimateResponse = false;
+                            this._currentResponseIsComplete = true;
+                            console.log('[response-animation-complete] Marked current response as complete');
+                            this.requestUpdate();
+                        }}
                     ></assistant-view>
                 `;
 
@@ -914,11 +932,11 @@ export class CheatingDaddyApp extends LitElement {
 
     render() {
         const viewClassMap = {
-            'assistant': 'assistant-view',
-            'onboarding': 'onboarding-view',
-            'customize': 'settings-view',
-            'help': 'help-view',
-            'history': 'history-view',
+            assistant: 'assistant-view',
+            onboarding: 'onboarding-view',
+            customize: 'settings-view',
+            help: 'help-view',
+            history: 'history-view',
         };
         const navbarHiddenClass = this.isNavbarHidden && this.currentView === 'assistant' ? 'navbar-hidden' : '';
         const mainContentClass = `main-content ${viewClassMap[this.currentView] || 'with-border'} ${navbarHiddenClass}`.trim();

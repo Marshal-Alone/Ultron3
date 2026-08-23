@@ -26,19 +26,20 @@ src/
 ### Key Architectural Patterns
 
 1. **IPC Communication**: Main ↔ Renderer via `ipcMain.handle()` and `ipcRenderer.invoke()`. Handlers defined in:
-   - `src/index.js` → `setupStorageIpcHandlers()`, `setupGeneralIpcHandlers()`
-   - `src/utils/gemini.js` → `setupGeminiIpcHandlers()`
-   - `src/utils/window.js` → `setupWindowIpcHandlers()`
+    - `src/index.js` → `setupStorageIpcHandlers()`, `setupGeneralIpcHandlers()`
+    - `src/utils/gemini.js` → `setupGeminiIpcHandlers()`
+    - `src/utils/window.js` → `setupWindowIpcHandlers()`
 
 2. **LitElement Components**: UI built with Lit 2.7.4 (bundled in `src/assets/`). Components use `css` template literals for scoped styles - not external CSS files.
 
 3. **Storage**: All user data stored in OS-specific config directories via `storage.js`:
-   - Config version-controlled with auto-reset on version mismatch
-   - Separate files: `config.json`, `credentials.json`, `preferences.json`, `keybinds.json`
+    - Config version-controlled with auto-reset on version mismatch
+    - Separate files: `config.json`, `credentials.json`, `preferences.json`, `keybinds.json`
 
 ## Developer Workflow
 
 ### Commands
+
 ```bash
 npm install          # Install dependencies
 npm start            # Run development app (Electron Forge)
@@ -48,10 +49,12 @@ npm run make         # Create distributable (installer/DMG)
 ```
 
 ### Code Style
+
 - Run `npx prettier --write .` before committing (4-space indent, 150 print width, single quotes)
 - No ESLint configured - `npm run lint` is a no-op
 
 ### Testing
+
 - Test framework: **Vitest** (config in `vitest.config.js`)
 - Tests in `src/__tests__/*.test.js`
 - Electron mocked via `src/__mocks__/electron.js`
@@ -60,13 +63,14 @@ npm run make         # Create distributable (installer/DMG)
 ## AI Integration (`src/utils/gemini.js`)
 
 - **WebSocket Session**: Real-time streaming via `@google/genai` SDK
-- **Audio Capture**: 
-  - macOS: `SystemAudioDump` binary (bundled in assets)
-  - Windows: Loopback audio via `getDisplayMedia`
+- **Audio Capture**:
+    - macOS: `SystemAudioDump` binary (bundled in assets)
+    - Windows: Loopback audio via `getDisplayMedia`
 - **Screen Analysis**: HTTP API for screenshot analysis (`sendImageToGeminiHttp`)
 - **Rate Limiting**: Per-model daily limits tracked in `storage.js`
 
 ### Profile Prompts (`src/utils/prompts.js`)
+
 Six profiles: `interview`, `sales`, `meeting`, `presentation`, `negotiation`, `exam`. Each has structured prompt with `intro`, `formatRequirements`, `searchUsage`, `content`, `outputInstructions`.
 
 ---
@@ -84,7 +88,7 @@ class GroqAIService {
     getClient() {
         const apiKey = storage.getGroqApiKey();
         if (!apiKey) throw new Error('Groq API key not configured');
-        
+
         return new OpenAI({
             baseURL: 'https://api.groq.com/openai/v1',
             apiKey: apiKey,
@@ -93,15 +97,20 @@ class GroqAIService {
 
     async sendMessage(prompt, imageBase64 = null) {
         const client = this.getClient();
-        const messages = [{
-            role: 'user',
-            content: imageBase64 
-                ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: imageBase64 } }]
-                : prompt
-        }];
+        const messages = [
+            {
+                role: 'user',
+                content: imageBase64
+                    ? [
+                          { type: 'text', text: prompt },
+                          { type: 'image_url', image_url: { url: imageBase64 } },
+                      ]
+                    : prompt,
+            },
+        ];
 
         const response = await client.chat.completions.create({
-            model: 'meta-llama/llama-4-scout-17b-16e-instruct',  // Vision-capable
+            model: 'meta-llama/llama-4-scout-17b-16e-instruct', // Vision-capable
             messages,
             max_tokens: 1500,
             temperature: 0.2,
@@ -124,7 +133,7 @@ const storage = require('../storage');
 // Provider configuration stored in preferences
 const getProvider = () => storage.getPreferences().aiProvider || 'gemini';
 
-const setProvider = (provider) => {
+const setProvider = provider => {
     storage.updatePreference('aiProvider', provider);
 };
 
@@ -145,10 +154,11 @@ module.exports = { getProvider, setProvider, sendMessage, geminiAI, groqAI };
 ### 3. Add Storage for Groq API Key
 
 In `storage.js`, add to `DEFAULT_CREDENTIALS`:
+
 ```javascript
 const DEFAULT_CREDENTIALS = {
-    apiKey: null,        // Gemini API key
-    groqApiKey: null,    // Groq API key
+    apiKey: null, // Gemini API key
+    groqApiKey: null, // Groq API key
 };
 
 // Add helper functions
@@ -170,36 +180,44 @@ function setGroqApiKey(apiKey) {
 html`
     <div class="setting-group">
         <label>AI Provider</label>
-        <select @change=${(e) => this.handleProviderChange(e.target.value)}>
+        <select @change=${e => this.handleProviderChange(e.target.value)}>
             <option value="gemini" ?selected=${this.aiProvider === 'gemini'}>Google Gemini</option>
             <option value="groq" ?selected=${this.aiProvider === 'groq'}>Groq (Llama)</option>
         </select>
     </div>
-    ${this.aiProvider === 'groq' ? html`
-        <input type="password" placeholder="Groq API Key" 
-               .value=${this.groqApiKey}
-               @change=${(e) => this.handleGroqKeyChange(e.target.value)} />
-    ` : ''}
-`
+    ${
+        this.aiProvider === 'groq'
+            ? html`
+                  <input
+                      type="password"
+                      placeholder="Groq API Key"
+                      .value=${this.groqApiKey}
+                      @change=${e => this.handleGroqKeyChange(e.target.value)}
+                  />
+              `
+            : ''
+    }
+`;
 ```
 
 ### Provider Comparison
 
-| Feature | Gemini | Groq |
-|---------|--------|------|
-| **Streaming** | WebSocket (real-time) | HTTP (request/response) |
-| **Audio Input** | Native support | Not supported |
-| **Vision** | Yes | Yes (Llama 4 Scout) |
-| **Speed** | Fast | Very fast (LPU) |
-| **Cost** | Free tier available | Free tier available |
+| Feature         | Gemini                | Groq                    |
+| --------------- | --------------------- | ----------------------- |
+| **Streaming**   | WebSocket (real-time) | HTTP (request/response) |
+| **Audio Input** | Native support        | Not supported           |
+| **Vision**      | Yes                   | Yes (Llama 4 Scout)     |
+| **Speed**       | Fast                  | Very fast (LPU)         |
+| **Cost**        | Free tier available   | Free tier available     |
 
 ### Dependencies
 
 Add to `package.json`:
+
 ```json
 {
     "dependencies": {
-        "openai": "^4.0.0"  // Used for Groq API (OpenAI-compatible)
+        "openai": "^4.0.0" // Used for Groq API (OpenAI-compatible)
     }
 }
 ```
@@ -211,6 +229,7 @@ Add to `package.json`:
 ## Critical Patterns
 
 ### Adding New IPC Handlers
+
 ```javascript
 // In main process (index.js or utils/*.js)
 ipcMain.handle('channel-name', async (event, arg) => {
@@ -222,21 +241,27 @@ const result = await window.require('electron').ipcRenderer.invoke('channel-name
 ```
 
 ### Creating LitElement Components
+
 ```javascript
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 
 class MyComponent extends LitElement {
-    static styles = css`/* scoped styles */`;
+    static styles = css`
+        /* scoped styles */
+    `;
     static properties = { myProp: { type: String } };
-    render() { return html`<div>${this.myProp}</div>`; }
+    render() {
+        return html`<div>${this.myProp}</div>`;
+    }
 }
 customElements.define('my-component', MyComponent);
 ```
 
 ### Storage Operations
+
 ```javascript
 const storage = require('./storage');
-storage.initializeStorage();  // Call on app startup
+storage.initializeStorage(); // Call on app startup
 const config = storage.getConfig();
 storage.updateConfig('key', value);
 storage.setApiKey(apiKey);
@@ -244,15 +269,16 @@ storage.setApiKey(apiKey);
 
 ## Platform-Specific Notes
 
-| Platform | Audio Capture | Signing |
-|----------|---------------|---------|
-| macOS | `SystemAudioDump` binary | Optional codesigning in `forge.config.js` |
-| Windows | Loopback via `getDisplayMedia` | Squirrel installer |
-| Linux | Microphone only | AppImage maker |
+| Platform | Audio Capture                  | Signing                                   |
+| -------- | ------------------------------ | ----------------------------------------- |
+| macOS    | `SystemAudioDump` binary       | Optional codesigning in `forge.config.js` |
+| Windows  | Loopback via `getDisplayMedia` | Squirrel installer                        |
+| Linux    | Microphone only                | AppImage maker                            |
 
 ## Future Migration (from AGENTS.md)
 
 The codebase is planned to migrate toward TypeScript/React with shadcn/ui. When contributing:
+
 - Prefer TypeScript strict mode for new files
 - Use `@/` path alias for imports from `src/`
 - Maintain secure IPC with parameter validation
@@ -260,10 +286,10 @@ The codebase is planned to migrate toward TypeScript/React with shadcn/ui. When 
 
 ## Key Files for New Features
 
-| Task | Primary Files |
-|------|---------------|
-| New UI view | `src/components/views/*.js`, register in `CheatingDaddyApp.js` |
-| New profile/prompt | `src/utils/prompts.js` |
+| Task               | Primary Files                                                             |
+| ------------------ | ------------------------------------------------------------------------- |
+| New UI view        | `src/components/views/*.js`, register in `CheatingDaddyApp.js`            |
+| New profile/prompt | `src/utils/prompts.js`                                                    |
 | Keyboard shortcuts | `src/utils/window.js` → `getDefaultKeybinds()`, `updateGlobalShortcuts()` |
-| User preferences | `src/storage.js`, add to `DEFAULT_PREFERENCES` |
-| AI functionality | `src/utils/gemini.js` |
+| User preferences   | `src/storage.js`, add to `DEFAULT_PREFERENCES`                            |
+| AI functionality   | `src/utils/gemini.js`                                                     |

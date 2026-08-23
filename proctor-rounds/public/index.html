@@ -1,110 +1,111 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Proctor Rounds — Test Environment</title>
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            overflow: hidden;
-            background: #06060b;
-            color: #e8e8f0;
-            font-family: 'Inter', sans-serif;
-        }
-        .header {
-            height: 50px;
-            background: #0a0a12;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 20px;
-        }
-        .split-container {
-            display: flex;
-            height: calc(100vh - 50px);
-            width: 100vw;
-        }
-        .pane {
-            flex: 1;
-            height: 100%;
-            border: none;
-        }
-        .divider {
-            width: 4px;
-            background: #161625;
-            cursor: col-resize;
-            border-left: 1px solid rgba(255,255,255,0.05);
-            border-right: 1px solid rgba(255,255,255,0.05);
-        }
-        .loading-overlay {
-            position: fixed;
-            inset: 0;
-            background: #06060b;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-        }
-        .loading-overlay h2 {
-            margin-bottom: 10px;
-            color: #00d4ff;
-        }
-    </style>
-</head>
-<body>
-    <div class="loading-overlay" id="loading">
-        <h2>Initializing Test Session...</h2>
-        <p>Creating combined view for Candidate and Proctor</p>
-    </div>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Proctor Rounds — Test Environment</title>
+        <style>
+            body,
+            html {
+                margin: 0;
+                padding: 0;
+                height: 100vh;
+                overflow: hidden;
+                background: #06060b;
+                color: #e8e8f0;
+                font-family: 'Inter', sans-serif;
+            }
+            .header {
+                height: 50px;
+                background: #0a0a12;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0 20px;
+            }
+            .split-container {
+                display: flex;
+                height: calc(100vh - 50px);
+                width: 100vw;
+            }
+            .pane {
+                flex: 1;
+                height: 100%;
+                border: none;
+            }
+            .divider {
+                width: 4px;
+                background: #161625;
+                cursor: col-resize;
+                border-left: 1px solid rgba(255, 255, 255, 0.05);
+                border-right: 1px solid rgba(255, 255, 255, 0.05);
+            }
+            .loading-overlay {
+                position: fixed;
+                inset: 0;
+                background: #06060b;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                z-index: 100;
+            }
+            .loading-overlay h2 {
+                margin-bottom: 10px;
+                color: #00d4ff;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="loading-overlay" id="loading">
+            <h2>Initializing Test Session...</h2>
+            <p>Creating combined view for Candidate and Proctor</p>
+        </div>
 
-    <div class="header">
-        <h3 style="margin: 0; font-size: 1rem;">🧪 Proctor Rounds — Local Test Environment</h3>
-        <span style="font-size: 0.85rem; color: #9090b0;">Left: Candidate | Right: Proctor</span>
-    </div>
+        <div class="header">
+            <h3 style="margin: 0; font-size: 1rem">🧪 Proctor Rounds — Local Test Environment</h3>
+            <span style="font-size: 0.85rem; color: #9090b0">Left: Candidate | Right: Proctor</span>
+        </div>
 
-    <div class="split-container">
-        <iframe id="candidateFrame" class="pane"></iframe>
-        <div class="divider"></div>
-        <iframe id="proctorFrame" class="pane"></iframe>
-    </div>
+        <div class="split-container">
+            <iframe id="candidateFrame" class="pane"></iframe>
+            <div class="divider"></div>
+            <iframe id="proctorFrame" class="pane"></iframe>
+        </div>
 
-    <script>
-        async function initTestSession() {
-            try {
-                const res = await fetch('/api/session', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        candidateName: 'Test Candidate', 
-                        proctorName: 'Test Proctor', 
-                        language: 'javascript' 
-                    })
-                });
-                
-                const data = await res.json();
-                
-                document.getElementById('candidateFrame').src = data.candidateUrl + '&test=true';
-                document.getElementById('proctorFrame').src = data.proctorUrl + '&test=true';
-                
-                // Hide loading overlay once iframes start loading
-                setTimeout(() => {
-                    document.getElementById('loading').style.display = 'none';
-                }, 500);
-            } catch (err) {
-                document.getElementById('loading').innerHTML = `
+        <script>
+            async function initTestSession() {
+                try {
+                    const res = await fetch('/api/session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            candidateName: 'Test Candidate',
+                            proctorName: 'Test Proctor',
+                            language: 'javascript',
+                        }),
+                    });
+
+                    const data = await res.json();
+
+                    document.getElementById('candidateFrame').src = data.candidateUrl + '&test=true';
+                    document.getElementById('proctorFrame').src = data.proctorUrl + '&test=true';
+
+                    // Hide loading overlay once iframes start loading
+                    setTimeout(() => {
+                        document.getElementById('loading').style.display = 'none';
+                    }, 500);
+                } catch (err) {
+                    document.getElementById('loading').innerHTML = `
                     <h2 style="color: #ef4444;">Error creating session</h2>
                     <p>${err.message}</p>
                     <p>Make sure the server is running.</p>
                 `;
+                }
             }
-        }
 
-        initTestSession();
-    </script>
-</body>
+            initTestSession();
+        </script>
+    </body>
 </html>

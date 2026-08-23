@@ -17,12 +17,12 @@ class GeminiLiveService {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 3;
         this.isUserClosing = false;
-        
+
         // Event callbacks
-        this.onTranscript = null;    // (text, speakerId) => void
-        this.onModelOutput = null;   // (chunk) => void
-        this.onTurnComplete = null;  // () => void
-        this.onStatus = null;        // (statusString) => void
+        this.onTranscript = null; // (text, speakerId) => void
+        this.onModelOutput = null; // (chunk) => void
+        this.onTurnComplete = null; // () => void
+        this.onStatus = null; // (statusString) => void
     }
 
     /**
@@ -50,12 +50,12 @@ class GeminiLiveService {
                         this.reconnectAttempts = 0;
                         this.onStatus?.('Live session connected');
                     },
-                    onmessage: (message) => this._handleMessage(message),
-                    onerror: (error) => {
+                    onmessage: message => this._handleMessage(message),
+                    onerror: error => {
                         console.error('[GeminiLive] Error:', error.message);
                         this.onStatus?.(`Error: ${error.message}`);
                     },
-                    onclose: (event) => {
+                    onclose: event => {
                         console.log('[GeminiLive] Closed:', event.reason);
                         if (!this.isUserClosing) {
                             this._attemptReconnect();
@@ -166,9 +166,9 @@ class GeminiLiveService {
 
         if (success && this.conversationHistory.length > 0) {
             // Context restoration message
-            const contextLines = this.conversationHistory.slice(-20).map(
-                turn => `[Interviewer]: ${turn.transcription}\n[Answer]: ${turn.aiResponse}`
-            );
+            const contextLines = this.conversationHistory
+                .slice(-20)
+                .map(turn => `[Interviewer]: ${turn.transcription}\n[Answer]: ${turn.aiResponse}`);
             const restoreMsg = `Session reconnected. Here is the conversation context so far:\n\n${contextLines.join('\n\n')}\n\nContinue assisting.`;
             await this.sendText(restoreMsg);
         }

@@ -35,21 +35,22 @@ npm start
 ## Settings
 
 Right-click the tray icon → **Settings** to:
+
 - Change the global shortcut
 - Edit the stamp template using variables:
-  - `{time}` → `HH:MM:SS`
-  - `{date}` → `YYYY-MM-DD`
-  - `{datetime}` → `YYYY-MM-DD HH:MM:SS`
+    - `{time}` → `HH:MM:SS`
+    - `{date}` → `YYYY-MM-DD`
+    - `{datetime}` → `YYYY-MM-DD HH:MM:SS`
 
 ---
 
 ## Platform notes
 
-| OS | Paste method |
-|---|---|
-| macOS | AppleScript `keystroke "v" using command down` |
-| Windows | PowerShell `SendKeys('^v')` |
-| Linux | `xdotool key ctrl+v` (install xdotool if needed) |
+| OS      | Paste method                                     |
+| ------- | ------------------------------------------------ |
+| macOS   | AppleScript `keystroke "v" using command down`   |
+| Windows | PowerShell `SendKeys('^v')`                      |
+| Linux   | `xdotool key ctrl+v` (install xdotool if needed) |
 
 The app temporarily copies your stamp text to the clipboard, pastes it, then restores your original clipboard — all within ~600ms.
 

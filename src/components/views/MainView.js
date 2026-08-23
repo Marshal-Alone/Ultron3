@@ -4,7 +4,11 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class MainView extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family:
+                'Inter',
+                -apple-system,
+                BlinkMacSystemFont,
+                sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -106,7 +110,8 @@ export class MainView extends LitElement {
         }
 
         @keyframes blink-red {
-            0%, 100% {
+            0%,
+            100% {
                 border-color: var(--border-color);
             }
             50% {
@@ -197,10 +202,10 @@ export class MainView extends LitElement {
 
     constructor() {
         super();
-        this.onStart = () => { };
-        this.onAPIKeyHelp = () => { };
+        this.onStart = () => {};
+        this.onAPIKeyHelp = () => {};
         this.isInitializing = false;
-        this.onLayoutModeChange = () => { };
+        this.onLayoutModeChange = () => {};
         this.showApiKeyError = false;
         this.showGroqApiKeyError = false;
         this.boundKeydownHandler = this.handleKeydown.bind(this);
@@ -281,12 +286,16 @@ export class MainView extends LitElement {
 
     triggerApiKeyError() {
         this.showApiKeyError = true;
-        setTimeout(() => { this.showApiKeyError = false; }, 1000);
+        setTimeout(() => {
+            this.showApiKeyError = false;
+        }, 1000);
     }
 
     triggerGroqApiKeyError() {
         this.showGroqApiKeyError = true;
-        setTimeout(() => { this.showGroqApiKeyError = false; }, 1000);
+        setTimeout(() => {
+            this.showGroqApiKeyError = false;
+        }, 1000);
     }
 
     render() {
@@ -332,9 +341,7 @@ export class MainView extends LitElement {
                         @input=${this.handleGroqInput}
                         class="${this.showGroqApiKeyError ? 'api-key-error' : ''}"
                     />
-                    <button @click=${this.handleGroqStartClick} class="start-button groq ${this.isInitializing ? 'initializing' : ''}">
-                        Start
-                    </button>
+                    <button @click=${this.handleGroqStartClick} class="start-button groq ${this.isInitializing ? 'initializing' : ''}">Start</button>
                 </div>
             </div>
         `;
@@ -342,5 +349,3 @@ export class MainView extends LitElement {
 }
 
 customElements.define('main-view', MainView);
-
-

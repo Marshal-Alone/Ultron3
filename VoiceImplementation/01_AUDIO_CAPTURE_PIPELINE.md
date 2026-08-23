@@ -5,6 +5,7 @@
 To listen in real-time to a conversation, the system must capture **system audio output** (what other speakers on Zoom, Meet, YouTube, or phone calls are saying) as well as the **user's microphone input** (what the user is saying).
 
 Capturing system audio is notoriously platform-dependent across operating systems:
+
 - **Windows**: Modern Chromium/Electron provides built-in loopback audio capture via `desktopCapturer` and `navigator.mediaDevices.getDisplayMedia({ audio: true })`.
 - **macOS**: Apple's security sandbox restricts loopback audio in WebRTC. A native CoreAudio capture helper daemon (`SystemAudioDump`) is required.
 - **Linux**: Handled via PulseAudio / PipeWire monitor sinks in `navigator.mediaDevices.getDisplayMedia({ audio: true })`.
@@ -18,6 +19,7 @@ Capturing system audio is notoriously platform-dependent across operating system
 In Electron, system audio capture requires hooking into the Chromium display media request handler in the **Main Process**, and then requesting the stream in the **Renderer Process**.
 
 #### 1. Main Process Hook (`window.js`):
+
 ```javascript
 const { session, desktopCapturer } = require('electron');
 
@@ -34,6 +36,7 @@ session.defaultSession.setDisplayMediaRequestHandler(
 ```
 
 #### 2. Renderer Process Capture (`renderer.js`):
+
 ```javascript
 const SAMPLE_RATE = 24000;
 
@@ -61,6 +64,7 @@ const mediaStream = await navigator.mediaDevices.getDisplayMedia({
 Since macOS does not allow Chromium to tap into system loopback directly, a native CLI utility (`SystemAudioDump`) compiled against macOS `CoreAudio` / `ScreenCaptureKit` runs as a child process and streams raw PCM audio over `stdout`.
 
 #### 1. Spawning the Daemon (`gemini.js`):
+
 ```javascript
 const { spawn } = require('child_process');
 const path = require('path');
@@ -74,9 +78,7 @@ async function startMacOSAudioCapture(geminiSessionRef) {
     // Clean up any stale processes first
     spawn('pkill', ['-f', 'SystemAudioDump'], { stdio: 'ignore' });
 
-    let systemAudioPath = app.isPackaged
-        ? path.join(process.resourcesPath, 'SystemAudioDump')
-        : path.join(__dirname, '../assets', 'SystemAudioDump');
+    let systemAudioPath = app.isPackaged ? path.join(process.resourcesPath, 'SystemAudioDump') : path.join(__dirname, '../assets', 'SystemAudioDump');
 
     systemAudioProc = spawn(systemAudioPath, [], {
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -125,6 +127,7 @@ function stopMacOSAudioCapture() {
 ```
 
 #### 2. Downmixing Stereo to Mono (16-bit PCM):
+
 ```javascript
 function convertStereoToMono(stereoBuffer) {
     const samples = stereoBuffer.length / 4; // 2 channels * 2 bytes = 4 bytes per sample pair
@@ -219,6 +222,7 @@ async function startMicrophoneCapture() {
 ## 3. Web Audio Processing & Data Conversion
 
 ### Float32 to Int16 Linear PCM Conversion
+
 Web Audio API's `ScriptProcessorNode` / `AudioWorklet` delivers audio samples as `Float32` in the range `[-1.0, 1.0]`. Gemini Live and Whisper require signed 16-bit integers (`Int16`, range `[-32768, 32767]`).
 
 ```javascript
@@ -234,6 +238,7 @@ function convertFloat32ToInt16(float32Array) {
 ```
 
 ### Base64 Encoding Utility
+
 ```javascript
 function arrayBufferToBase64(buffer) {
     let binary = '';
@@ -250,15 +255,15 @@ function arrayBufferToBase64(buffer) {
 
 ## 4. Audio Chunking & Timing Specifications
 
-| Parameter | Value | Rationale |
-|---|---|---|
-| **Sample Rate** | `24,000 Hz` | Native input rate expected by Gemini Multimodal Live API. |
-| **Bit Depth** | `16-bit` | Standard PCM format (`audio/pcm;rate=24000`). |
-| **Channels** | `1 (Mono)` | Eliminates redundant channel bandwidth; AI models expect mono. |
-| **Chunk Duration** | `0.1s (100ms)` | Optimal balance between network overhead and speech latency. |
-| **Samples per Chunk** | `2,400 samples` | `24000 * 0.1 = 2400` |
-| **Bytes per Chunk** | `4,800 bytes` | `2400 samples * 2 bytes = 4800` bytes |
-| **ScriptProcessor Buffer**| `4096` | Prevents browser audio dropouts / glitching during heavy CPU loads. |
+| Parameter                  | Value           | Rationale                                                           |
+| -------------------------- | --------------- | ------------------------------------------------------------------- |
+| **Sample Rate**            | `24,000 Hz`     | Native input rate expected by Gemini Multimodal Live API.           |
+| **Bit Depth**              | `16-bit`        | Standard PCM format (`audio/pcm;rate=24000`).                       |
+| **Channels**               | `1 (Mono)`      | Eliminates redundant channel bandwidth; AI models expect mono.      |
+| **Chunk Duration**         | `0.1s (100ms)`  | Optimal balance between network overhead and speech latency.        |
+| **Samples per Chunk**      | `2,400 samples` | `24000 * 0.1 = 2400`                                                |
+| **Bytes per Chunk**        | `4,800 bytes`   | `2400 samples * 2 bytes = 4800` bytes                               |
+| **ScriptProcessor Buffer** | `4096`          | Prevents browser audio dropouts / glitching during heavy CPU loads. |
 
 ---
 
@@ -279,13 +284,13 @@ function createWavHeader(dataSize, sampleRate = 24000, channels = 1, bitDepth = 
 
     // "fmt " sub-chunk
     header.write('fmt ', 12);
-    header.writeUInt32LE(16, 16);          // Subchunk1Size (16 for PCM)
-    header.writeUInt16LE(1, 20);           // AudioFormat (1 for PCM)
-    header.writeUInt16LE(channels, 22);    // NumChannels
-    header.writeUInt32LE(sampleRate, 24);  // SampleRate
-    header.writeUInt32LE(byteRate, 28);    // ByteRate
-    header.writeUInt16LE(blockAlign, 32);  // BlockAlign
-    header.writeUInt16LE(bitDepth, 34);    // BitsPerSample
+    header.writeUInt32LE(16, 16); // Subchunk1Size (16 for PCM)
+    header.writeUInt16LE(1, 20); // AudioFormat (1 for PCM)
+    header.writeUInt16LE(channels, 22); // NumChannels
+    header.writeUInt32LE(sampleRate, 24); // SampleRate
+    header.writeUInt32LE(byteRate, 28); // ByteRate
+    header.writeUInt16LE(blockAlign, 32); // BlockAlign
+    header.writeUInt16LE(bitDepth, 34); // BitsPerSample
 
     // "data" sub-chunk
     header.write('data', 36);

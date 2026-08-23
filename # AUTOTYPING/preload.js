@@ -1,127 +1,126 @@
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
-  getConfig: () => {
-    return new Promise((resolve) => {
-      const listener = (event, config) => {
-        ipcRenderer.off('config-data', listener)
-        resolve(config)
-      }
-      ipcRenderer.on('config-data', listener)
-      ipcRenderer.send('get-config')
-    })
-  },
+    getConfig: () => {
+        return new Promise(resolve => {
+            const listener = (event, config) => {
+                ipcRenderer.off('config-data', listener);
+                resolve(config);
+            };
+            ipcRenderer.on('config-data', listener);
+            ipcRenderer.send('get-config');
+        });
+    },
 
-  updateConfig: (newConfig) => {
-    return new Promise((resolve, reject) => {
-      let errorTimer
-      const listener = (event, config) => {
-        clearTimeout(errorTimer)
-        ipcRenderer.off('config-updated', listener)
-        resolve(config)
-      }
-      errorTimer = setTimeout(() => {
-        ipcRenderer.off('config-updated', listener)
-        reject(new Error('Config update timeout'))
-      }, 5000)
-      
-      ipcRenderer.on('config-updated', listener)
-      ipcRenderer.send('update-config', newConfig)
-    })
-  },
+    updateConfig: newConfig => {
+        return new Promise((resolve, reject) => {
+            let errorTimer;
+            const listener = (event, config) => {
+                clearTimeout(errorTimer);
+                ipcRenderer.off('config-updated', listener);
+                resolve(config);
+            };
+            errorTimer = setTimeout(() => {
+                ipcRenderer.off('config-updated', listener);
+                reject(new Error('Config update timeout'));
+            }, 5000);
 
-  addText: (name, text) => {
-    return new Promise((resolve) => {
-      const listener = (event, texts) => {
-        ipcRenderer.off('text-added', listener)
-        resolve(texts)
-      }
-      ipcRenderer.on('text-added', listener)
-      ipcRenderer.send('add-text', name, text)
-    })
-  },
+            ipcRenderer.on('config-updated', listener);
+            ipcRenderer.send('update-config', newConfig);
+        });
+    },
 
-  removeText: (index) => {
-    return new Promise((resolve) => {
-      const listener = (event, texts) => {
-        ipcRenderer.off('text-removed', listener)
-        resolve(texts)
-      }
-      ipcRenderer.on('text-removed', listener)
-      ipcRenderer.send('remove-text', index)
-    })
-  },
+    addText: (name, text) => {
+        return new Promise(resolve => {
+            const listener = (event, texts) => {
+                ipcRenderer.off('text-added', listener);
+                resolve(texts);
+            };
+            ipcRenderer.on('text-added', listener);
+            ipcRenderer.send('add-text', name, text);
+        });
+    },
 
-  stopTyping: () => {
-    return new Promise((resolve) => {
-      const listener = (event) => {
-        ipcRenderer.off('typing-stopped', listener)
-        resolve()
-      }
-      ipcRenderer.on('typing-stopped', listener)
-      ipcRenderer.send('stop-typing')
-    })
-  },
+    removeText: index => {
+        return new Promise(resolve => {
+            const listener = (event, texts) => {
+                ipcRenderer.off('text-removed', listener);
+                resolve(texts);
+            };
+            ipcRenderer.on('text-removed', listener);
+            ipcRenderer.send('remove-text', index);
+        });
+    },
 
-  sendTypingKeyDown: () => {
-    ipcRenderer.send('typing-key-down')
-  },
+    stopTyping: () => {
+        return new Promise(resolve => {
+            const listener = event => {
+                ipcRenderer.off('typing-stopped', listener);
+                resolve();
+            };
+            ipcRenderer.on('typing-stopped', listener);
+            ipcRenderer.send('stop-typing');
+        });
+    },
 
-  sendTypingKeyUp: () => {
-    ipcRenderer.send('typing-key-up')
-  },
+    sendTypingKeyDown: () => {
+        ipcRenderer.send('typing-key-down');
+    },
 
-  onTextTyped: (callback) => {
-    ipcRenderer.on('text-typed', (event, data) => {
-      callback(data)
-    })
-  },
+    sendTypingKeyUp: () => {
+        ipcRenderer.send('typing-key-up');
+    },
 
-  onTypingStopped: (callback) => {
-    ipcRenderer.on('typing-stopped', () => {
-      callback()
-    })
-  },
+    onTextTyped: callback => {
+        ipcRenderer.on('text-typed', (event, data) => {
+            callback(data);
+        });
+    },
 
-  onTypingPaused: (callback) => {
-    ipcRenderer.on('typing-paused', () => {
-      callback()
-    })
-  },
+    onTypingStopped: callback => {
+        ipcRenderer.on('typing-stopped', () => {
+            callback();
+        });
+    },
 
-  onTypingResumed: (callback) => {
-    ipcRenderer.on('typing-resumed', () => {
-      callback()
-    })
-  },
+    onTypingPaused: callback => {
+        ipcRenderer.on('typing-paused', () => {
+            callback();
+        });
+    },
 
-  onTypingFinished: (callback) => {
-    ipcRenderer.on('typing-finished', () => {
-      callback()
-    })
-  },
+    onTypingResumed: callback => {
+        ipcRenderer.on('typing-resumed', () => {
+            callback();
+        });
+    },
 
-  getLogs: () => {
-    return ipcRenderer.invoke('get-logs')
-  },
+    onTypingFinished: callback => {
+        ipcRenderer.on('typing-finished', () => {
+            callback();
+        });
+    },
 
-  clearLogs: () => {
-    return ipcRenderer.invoke('clear-logs')
-  },
+    getLogs: () => {
+        return ipcRenderer.invoke('get-logs');
+    },
 
-  onLogEntry: (callback) => {
-    ipcRenderer.on('app-log', (event, entry) => {
-      callback(entry)
-    })
-  },
+    clearLogs: () => {
+        return ipcRenderer.invoke('clear-logs');
+    },
 
-  logError: (source, message, details = '') => {
-    ipcRenderer.send('app-log', {
-      level: 'error',
-      source,
-      message,
-      details
-    })
-  }
-})
+    onLogEntry: callback => {
+        ipcRenderer.on('app-log', (event, entry) => {
+            callback(entry);
+        });
+    },
 
+    logError: (source, message, details = '') => {
+        ipcRenderer.send('app-log', {
+            level: 'error',
+            source,
+            message,
+            details,
+        });
+    },
+});

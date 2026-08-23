@@ -22,7 +22,7 @@
 // This error comes from performance monitoring libraries/extensions, not our code
 if (typeof window !== 'undefined') {
     const originalError = window.onerror;
-    window.onerror = function(message, source, lineno, colno, error) {
+    window.onerror = function (message, source, lineno, colno, error) {
         // Suppress the "mgt.clearMarks is not a function" error from external tools
         if (message && message.includes('mgt.clearMarks')) {
             console.debug('ℹ️ Suppressed external monitoring error (mgt.clearMarks)');

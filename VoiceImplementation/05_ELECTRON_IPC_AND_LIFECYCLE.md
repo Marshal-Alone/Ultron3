@@ -3,6 +3,7 @@
 ## 1. Process Architecture & IPC Schema
 
 The application uses Electron's multi-process architecture:
+
 - **Main Process (Node.js)**: Manages OS windows, native audio capture, WebSocket connections to Gemini Live, HTTP requests to Groq, and child process execution.
 - **Renderer Process (Chromium)**: Handles Web Audio stream generation, microphone capture, UI event loop, and streaming Markdown rendering.
 
@@ -12,35 +13,35 @@ The application uses Electron's multi-process architecture:
 
 ### A. Renderer to Main Process (`ipcRenderer.invoke`)
 
-| IPC Channel | Payload | Response | Description |
-|---|---|---|---|
-| `initialize-gemini` | `(apiKey, customPrompt, profile, language)` | `{ success: boolean }` | Establishes Gemini Live WebSocket connection. |
-| `initialize-local` | `(llmModel, whisperModel, profile, prompt)` | `{ success: boolean }` | Starts local Whisper & LLaMA native servers. |
-| `send-audio-content` | `{ data: base64, mimeType: string }` | `{ success: boolean }` | Streams 24kHz system loopback audio chunk (0.1s). |
-| `send-mic-audio-content` | `{ data: base64, mimeType: string }` | `{ success: boolean }` | Streams 24kHz user microphone audio chunk (0.1s). |
-| `send-text-message` | `text: string` | `{ success: boolean }` | Dispatches manual text message into active session. |
-| `send-image-content` | `{ data: base64, prompt: string }` | `{ success, text, model }` | Dispatches screenshot for on-demand vision reasoning. |
-| `start-macos-audio` | *none* | `{ success: boolean }` | Spawns `SystemAudioDump` daemon on macOS. |
-| `stop-macos-audio` | *none* | `{ success: boolean }` | Kills `SystemAudioDump` process. |
-| `close-session` | *none* | `{ success: boolean }` | Closes active AI session and releases resources. |
-| `toggle-window-visibility` | *none* | `{ success: boolean }` | Toggles window between hidden and shown inactive. |
+| IPC Channel                | Payload                                     | Response                   | Description                                           |
+| -------------------------- | ------------------------------------------- | -------------------------- | ----------------------------------------------------- |
+| `initialize-gemini`        | `(apiKey, customPrompt, profile, language)` | `{ success: boolean }`     | Establishes Gemini Live WebSocket connection.         |
+| `initialize-local`         | `(llmModel, whisperModel, profile, prompt)` | `{ success: boolean }`     | Starts local Whisper & LLaMA native servers.          |
+| `send-audio-content`       | `{ data: base64, mimeType: string }`        | `{ success: boolean }`     | Streams 24kHz system loopback audio chunk (0.1s).     |
+| `send-mic-audio-content`   | `{ data: base64, mimeType: string }`        | `{ success: boolean }`     | Streams 24kHz user microphone audio chunk (0.1s).     |
+| `send-text-message`        | `text: string`                              | `{ success: boolean }`     | Dispatches manual text message into active session.   |
+| `send-image-content`       | `{ data: base64, prompt: string }`          | `{ success, text, model }` | Dispatches screenshot for on-demand vision reasoning. |
+| `start-macos-audio`        | _none_                                      | `{ success: boolean }`     | Spawns `SystemAudioDump` daemon on macOS.             |
+| `stop-macos-audio`         | _none_                                      | `{ success: boolean }`     | Kills `SystemAudioDump` process.                      |
+| `close-session`            | _none_                                      | `{ success: boolean }`     | Closes active AI session and releases resources.      |
+| `toggle-window-visibility` | _none_                                      | `{ success: boolean }`     | Toggles window between hidden and shown inactive.     |
 
 ---
 
 ### B. Main to Renderer Process (`webContents.send`)
 
-| IPC Channel | Payload | Action in Renderer |
-|---|---|---|
-| `new-response` | `text: string` | Appends a new conversation card and displays first token. |
-| `update-response` | `text: string` | Continuously updates the active response card with incoming text. |
-| `update-status` | `status: string` | Updates status pill (`Listening...`, `Transcribing...`, etc.). |
-| `save-conversation-turn` | `{ sessionId, turn, fullHistory }` | Persists conversation turn into local storage. |
-| `click-through-toggled` | `isEnabled: boolean` | Updates UI indicator when mouse events pass through. |
-| `navigate-previous-response` | *none* | Navigates to previous AI response card. |
-| `navigate-next-response` | *none* | Navigates to next AI response card. |
-| `scroll-response-up` | *none* | Scrolls the response container up smoothly. |
-| `scroll-response-down` | *none* | Scrolls the response container down smoothly. |
-| `clear-sensitive-data` | *none* | Emergency wipe: deletes history and closes application. |
+| IPC Channel                  | Payload                            | Action in Renderer                                                |
+| ---------------------------- | ---------------------------------- | ----------------------------------------------------------------- |
+| `new-response`               | `text: string`                     | Appends a new conversation card and displays first token.         |
+| `update-response`            | `text: string`                     | Continuously updates the active response card with incoming text. |
+| `update-status`              | `status: string`                   | Updates status pill (`Listening...`, `Transcribing...`, etc.).    |
+| `save-conversation-turn`     | `{ sessionId, turn, fullHistory }` | Persists conversation turn into local storage.                    |
+| `click-through-toggled`      | `isEnabled: boolean`               | Updates UI indicator when mouse events pass through.              |
+| `navigate-previous-response` | _none_                             | Navigates to previous AI response card.                           |
+| `navigate-next-response`     | _none_                             | Navigates to next AI response card.                               |
+| `scroll-response-up`         | _none_                             | Scrolls the response container up smoothly.                       |
+| `scroll-response-down`       | _none_                             | Scrolls the response container down smoothly.                     |
+| `clear-sensitive-data`       | _none_                             | Emergency wipe: deletes history and closes application.           |
 
 ---
 
@@ -56,10 +57,10 @@ function createStealthWindow() {
         minWidth: 700,
         minHeight: 320,
         resizable: true,
-        frame: false,               // Frameless borderless window
-        transparent: true,          // Transparent background
+        frame: false, // Frameless borderless window
+        transparent: true, // Transparent background
         hasShadow: false,
-        alwaysOnTop: true,          // Floats above other windows
+        alwaysOnTop: true, // Floats above other windows
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,

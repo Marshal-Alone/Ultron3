@@ -4,7 +4,11 @@ import { resizeLayout } from '../../utils/windowResize.js';
 export class HistoryView extends LitElement {
     static styles = css`
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family:
+                'Inter',
+                -apple-system,
+                BlinkMacSystemFont,
+                sans-serif;
             cursor: default;
             user-select: none;
         }
@@ -569,12 +573,12 @@ export class HistoryView extends LitElement {
     async handleClearHistory() {
         const confirmed = confirm(
             '⚠️ Clear all conversation history?\n\n' +
-            'This will permanently delete all saved conversations and cannot be undone.\n\n' +
-            'Type "DELETE" to confirm:'
+                'This will permanently delete all saved conversations and cannot be undone.\n\n' +
+                'Type "DELETE" to confirm:'
         );
-        
+
         if (!confirmed) return;
-        
+
         // Ask for confirmation by typing DELETE
         const userInput = prompt('Type "DELETE" to permanently clear all history:');
         if (userInput !== 'DELETE') {
@@ -634,17 +638,23 @@ export class HistoryView extends LitElement {
 
         return html`
             <div class="history-container" style="display: flex; flex-direction: column; height: 100%;">
-                <div style="padding: 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                <div
+                    style="padding: 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;"
+                >
                     <div style="font-weight: 500; color: var(--text-color);">Conversation History</div>
-                    ${this.sessions.length > 0 ? html`
-                        <button 
-                            class="back-button" 
-                            @click=${() => this.handleClearHistory()}
-                            style="background: rgba(241, 76, 76, 0.1); color: var(--error-color); border-color: var(--error-color);"
-                        >
-                            Clear All
-                        </button>
-                    ` : ''}
+                    ${
+                        this.sessions.length > 0
+                            ? html`
+                                  <button
+                                      class="back-button"
+                                      @click=${() => this.handleClearHistory()}
+                                      style="background: rgba(241, 76, 76, 0.1); color: var(--error-color); border-color: var(--error-color);"
+                                  >
+                                      Clear All
+                                  </button>
+                              `
+                            : ''
+                    }
                 </div>
                 <div class="sessions-list" style="flex: 1; overflow-y: auto;">
                     ${this.sessions.map(
@@ -673,18 +683,26 @@ export class HistoryView extends LitElement {
 
         return html`
             <div class="session-context">
-                ${profile ? html`
-                    <div class="session-context-row">
-                        <span class="context-label">Profile:</span>
-                        <span class="context-value">${profileNames[profile] || profile}</span>
-                    </div>
-                ` : ''}
-                ${customPrompt ? html`
-                    <div class="session-context-row">
-                        <span class="context-label">Custom Prompt:</span>
-                        <span class="custom-prompt-value">${customPrompt}</span>
-                    </div>
-                ` : ''}
+                ${
+                    profile
+                        ? html`
+                              <div class="session-context-row">
+                                  <span class="context-label">Profile:</span>
+                                  <span class="context-value">${profileNames[profile] || profile}</span>
+                              </div>
+                          `
+                        : ''
+                }
+                ${
+                    customPrompt
+                        ? html`
+                              <div class="session-context-row">
+                                  <span class="context-label">Custom Prompt:</span>
+                                  <span class="custom-prompt-value">${customPrompt}</span>
+                              </div>
+                          `
+                        : ''
+                }
             </div>
         `;
     }
@@ -729,17 +747,21 @@ export class HistoryView extends LitElement {
 
         return html`
             <div class="screenshot-gallery">
-                ${screenshotReferences.map(screenshot => html`
-                    <div class="screenshot-item" @click=${() => this.handleScreenshotClick(screenshot)}>
-                        <img class="screenshot-image" src="data:image/png;base64,${screenshot.base64Data}" alt="Screenshot" />
-                        <div class="screenshot-info">
-                            <div class="screenshot-timestamp">${this.formatTimestamp(screenshot.timestamp)}</div>
-                            ${screenshot.aiResponse ? html`
-                                <div class="screenshot-response">${screenshot.aiResponse}</div>
-                            ` : html`<div class="screenshot-response" style="color: var(--text-muted);">No response</div>`}
+                ${screenshotReferences.map(
+                    screenshot => html`
+                        <div class="screenshot-item" @click=${() => this.handleScreenshotClick(screenshot)}>
+                            <img class="screenshot-image" src="data:image/png;base64,${screenshot.base64Data}" alt="Screenshot" />
+                            <div class="screenshot-info">
+                                <div class="screenshot-timestamp">${this.formatTimestamp(screenshot.timestamp)}</div>
+                                ${
+                                screenshot.aiResponse
+                                    ? html` <div class="screenshot-response">${screenshot.aiResponse}</div> `
+                                    : html`<div class="screenshot-response" style="color: var(--text-muted);">No response</div>`
+                            }
+                            </div>
                         </div>
-                    </div>
-                `)}
+                    `
+                )}
             </div>
         `;
     }
@@ -784,31 +806,24 @@ export class HistoryView extends LitElement {
                 </div>
             </div>
             <div class="view-tabs">
-                <button
-                    class="view-tab ${this.activeTab === 'conversation' ? 'active' : ''}"
-                    @click=${() => this.handleTabClick('conversation')}
-                >
+                <button class="view-tab ${this.activeTab === 'conversation' ? 'active' : ''}" @click=${() => this.handleTabClick('conversation')}>
                     Conversation ${hasConversation ? `(${conversationHistory.length})` : ''}
                 </button>
-                <button
-                    class="view-tab ${this.activeTab === 'screen' ? 'active' : ''}"
-                    @click=${() => this.handleTabClick('screen')}
-                >
+                <button class="view-tab ${this.activeTab === 'screen' ? 'active' : ''}" @click=${() => this.handleTabClick('screen')}>
                     Screen ${hasScreenshots ? `(${screenshotReferences.length})` : ''}
                 </button>
-                <button
-                    class="view-tab ${this.activeTab === 'context' ? 'active' : ''}"
-                    @click=${() => this.handleTabClick('context')}
-                >
+                <button class="view-tab ${this.activeTab === 'context' ? 'active' : ''}" @click=${() => this.handleTabClick('context')}>
                     Context ${hasContext ? '' : '(empty)'}
                 </button>
             </div>
             <div class="conversation-view">
-                ${this.activeTab === 'conversation'
-                    ? this.renderConversationContent()
-                    : this.activeTab === 'screen'
-                        ? this.renderScreenAnalysisContent()
-                        : this.renderContextContent()}
+                ${
+                    this.activeTab === 'conversation'
+                        ? this.renderConversationContent()
+                        : this.activeTab === 'screen'
+                          ? this.renderScreenAnalysisContent()
+                          : this.renderContextContent()
+                }
             </div>
         `;
     }
@@ -825,9 +840,11 @@ export class HistoryView extends LitElement {
                     </button>
                     <div class="screenshot-modal-content" @click=${e => e.stopPropagation()}>
                         <img class="screenshot-modal-image" src="data:image/png;base64,${this.selectedScreenshot.base64Data}" alt="Screenshot" />
-                        ${this.selectedScreenshot.aiResponse ? html`
-                            <div class="screenshot-modal-response">${this.selectedScreenshot.aiResponse}</div>
-                        ` : ''}
+                        ${
+                            this.selectedScreenshot.aiResponse
+                                ? html` <div class="screenshot-modal-response">${this.selectedScreenshot.aiResponse}</div> `
+                                : ''
+                        }
                     </div>
                 </div>
             `;
@@ -837,11 +854,7 @@ export class HistoryView extends LitElement {
             return html`<div class="history-container">${this.renderConversationView()}</div>`;
         }
 
-        return html`
-            <div class="history-container">
-                ${this.renderSessionsList()}
-            </div>
-        `;
+        return html` <div class="history-container">${this.renderSessionsList()}</div> `;
     }
 }
 

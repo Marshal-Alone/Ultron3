@@ -1,3 +1,19 @@
+// Ensure UTF-8 encoding across Windows console and process streams
+if (process.platform === 'win32') {
+    try {
+        const { execSync } = require('child_process');
+        execSync('chcp 65001', { stdio: 'ignore' });
+    } catch (_) {}
+    if (process.stdout && process.stdout._handle && typeof process.stdout._handle.setEncoding === 'function') {
+        process.stdout._handle.setEncoding('utf8');
+    }
+    if (process.stderr && process.stderr._handle && typeof process.stderr._handle.setEncoding === 'function') {
+        process.stderr._handle.setEncoding('utf8');
+    }
+}
+process.env.PYTHONIOENCODING = 'utf-8';
+process.env.LANG = 'en_US.UTF-8';
+
 if (require('electron-squirrel-startup')) {
     process.exit(0);
 }
@@ -36,59 +52,59 @@ if (!gotTheLock) {
     });
 
     app.whenReady().then(async () => {
-    // Initialize storage (checks version, resets if needed)
-    storage.initializeStorage();
+        // Initialize storage (checks version, resets if needed)
+        storage.initializeStorage();
 
-    createMainWindow();
-    setupGeminiIpcHandlers(geminiSessionRef);
-    setupStorageIpcHandlers();
-    setupGeneralIpcHandlers();
-});
+        createMainWindow();
+        setupGeminiIpcHandlers(geminiSessionRef);
+        setupStorageIpcHandlers();
+        setupGeneralIpcHandlers();
+    });
 
-app.on('window-all-closed', () => {
-    stopMacOSAudioCapture();
-    if (process.platform !== 'darwin') {
-        app.quit();
-    }
-});
+    app.on('window-all-closed', () => {
+        stopMacOSAudioCapture();
+        if (process.platform !== 'darwin') {
+            app.quit();
+        }
+    });
 
-// Auto-save session when app is about to quit
-app.on('before-quit', async (event) => {
-    console.log('=== APP QUIT - AUTO-SAVING SESSION ===');
-    
-    try {
-        if (currentSessionId) {
-            console.log(`Attempting to save session: ${currentSessionId}`);
-            const session = storage.getSession(currentSessionId);
-            console.log(`Retrieved session:`, session);
-            
-            if (session && (session.conversationHistory?.length > 0 || session.screenAnalysisHistory?.length > 0)) {
-                const result = storage.exportSessionToDownloads(currentSessionId);
-                if (result.success) {
-                    console.log(`✅ Session auto-saved successfully`);
-                    console.log(`Files saved:`, result.filepaths);
+    // Auto-save session when app is about to quit
+    app.on('before-quit', async event => {
+        console.log('=== APP QUIT - AUTO-SAVING SESSION ===');
+
+        try {
+            if (currentSessionId) {
+                console.log(`Attempting to save session: ${currentSessionId}`);
+                const session = storage.getSession(currentSessionId);
+                console.log(`Retrieved session:`, session);
+
+                if (session && (session.conversationHistory?.length > 0 || session.screenAnalysisHistory?.length > 0)) {
+                    const result = storage.exportSessionToDownloads(currentSessionId);
+                    if (result.success) {
+                        console.log(`✅ Session auto-saved successfully`);
+                        console.log(`Files saved:`, result.filepaths);
+                    } else {
+                        console.error('❌ Failed to auto-save session:', result.error);
+                    }
                 } else {
-                    console.error('❌ Failed to auto-save session:', result.error);
+                    console.log('⚠️ Session is empty, skipping export');
                 }
             } else {
-                console.log('⚠️ Session is empty, skipping export');
+                console.log('⚠️ No active session to save');
             }
-        } else {
-            console.log('⚠️ No active session to save');
+        } catch (error) {
+            console.error('❌ Error during app quit auto-save:', error);
         }
-    } catch (error) {
-        console.error('❌ Error during app quit auto-save:', error);
-    }
-    
-    // Stop audio capture
-    stopMacOSAudioCapture();
-});
 
-app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createMainWindow();
-    }
-});
+        // Stop audio capture
+        stopMacOSAudioCapture();
+    });
+
+    app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+            createMainWindow();
+        }
+    });
 } // Close the 'else' block from requestSingleInstanceLock
 
 function setupStorageIpcHandlers() {
@@ -227,6 +243,16 @@ function setupStorageIpcHandlers() {
             return { success: true };
         } catch (error) {
             console.error('Error updating preference:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('prompts:get-default-system-prompt', async (event, profile) => {
+        try {
+            const { getDefaultSystemPrompt } = require('./utils/prompts');
+            return { success: true, data: getDefaultSystemPrompt(profile || 'interview') };
+        } catch (error) {
+            console.error('Error getting default system prompt:', error);
             return { success: false, error: error.message };
         }
     });
@@ -386,14 +412,14 @@ function setupGeneralIpcHandlers() {
     });
 
     // Handle quick start Groq request from main process (sent via shortcut)
-    ipcMain.on('trigger-quick-start-groq', (event) => {
+    ipcMain.on('trigger-quick-start-groq', event => {
         console.log('Quick start Groq triggered via IPC');
         // The shortcut handler already sent 'quick-start-groq' to renderer
         // This is just for additional cleanup if needed
     });
 
     // Handle quick stop request from main process (sent via shortcut)
-    ipcMain.on('trigger-quick-stop', (event) => {
+    ipcMain.on('trigger-quick-stop', event => {
         console.log('Quick stop triggered via IPC');
         // The shortcut handler already sent 'quick-stop' to renderer
     });
@@ -572,15 +598,12 @@ function setupGeneralIpcHandlers() {
             console.log(`[KEYBOARD] Sending key: ${key}`);
             const escapedKey = String(key).replace(/'/g, "''").replace(/\\/g, '\\\\');
             const psCommand = `Add-Type -TypeDefinition @'\n${winInputCSharp}\n'@; [WinInput]::SendKey('${escapedKey}')`;
-            
-            execFile('powershell.exe', ['-NoProfile', '-Command', psCommand], 
-                { timeout: 2000 }, 
-                (error, stdout, stderr) => {
-                    if (error) {
-                        console.error(`[KEYBOARD] Error sending "${key}":`, (stderr || error.message).split('\n')[0]);
-                    }
+
+            execFile('powershell.exe', ['-NoProfile', '-Command', psCommand], { timeout: 2000 }, (error, stdout, stderr) => {
+                if (error) {
+                    console.error(`[KEYBOARD] Error sending "${key}":`, (stderr || error.message).split('\n')[0]);
                 }
-            );
+            });
         } catch (error) {
             console.error(`[KEYBOARD] Failed to send key "${key}":`, error.message);
         }
@@ -592,19 +615,16 @@ function setupGeneralIpcHandlers() {
             console.log(`[KEYBOARD] Sending key (sync): ${key}`);
             const escapedKey = String(key).replace(/'/g, "''").replace(/\\/g, '\\\\');
             const psCommand = `Add-Type -TypeDefinition @'\n${winInputCSharp}\n'@; [WinInput]::SendKey('${escapedKey}')`;
-            
+
             return new Promise((resolve, reject) => {
-                execFile('powershell.exe', ['-NoProfile', '-Command', psCommand], 
-                    { timeout: 2000 }, 
-                    (error, stdout, stderr) => {
-                        if (error) {
-                            console.error(`[KEYBOARD] Error sending "${key}":`, (stderr || error.message).split('\n')[0]);
-                            reject(error);
-                        } else {
-                            resolve(true);
-                        }
+                execFile('powershell.exe', ['-NoProfile', '-Command', psCommand], { timeout: 2000 }, (error, stdout, stderr) => {
+                    if (error) {
+                        console.error(`[KEYBOARD] Error sending "${key}":`, (stderr || error.message).split('\n')[0]);
+                        reject(error);
+                    } else {
+                        resolve(true);
                     }
-                );
+                });
             });
         } catch (error) {
             console.error(`[KEYBOARD] Failed to send key "${key}":`, error.message);
@@ -618,15 +638,17 @@ function setupGeneralIpcHandlers() {
 
     // Handler for typing entire text via SendInput C# executable
     ipcMain.handle('keyboard:type-text', async (event, data) => {
-        let text = typeof data === 'string' ? data : (data?.text || '');
-        const mode = (typeof data === 'object' && data?.mode) ? data.mode : 'instant';
-        
+        let text = typeof data === 'string' ? data : data?.text || '';
+        const mode = typeof data === 'object' && data?.mode ? data.mode : 'instant';
+
         if (!text || text.length === 0) return true;
 
         // Ignore UI loading texts if user accidentally triggers early
-        if (text.includes('Analyzing image and extracting code (Stage') || 
+        if (
+            text.includes('Analyzing image and extracting code (Stage') ||
             text.includes('Generating initial solution (Stage') ||
-            text.includes('*Verifying solution...')) {
+            text.includes('*Verifying solution...')
+        ) {
             console.log('[KEYBOARD] Ignoring UI loading text');
             return true;
         }
@@ -650,14 +672,14 @@ function setupGeneralIpcHandlers() {
                 lastTypedText = text;
                 lastTypedLineIndex = 0;
             }
-            
+
             const lines = text.split('\n');
             if (lastTypedLineIndex >= lines.length) {
                 console.log('[KEYBOARD] Reached end of text for lineByLine mode. Resetting.');
                 lastTypedLineIndex = 0;
                 return true; // Already typed everything
             }
-            
+
             text = lines[lastTypedLineIndex] + '\n';
             console.log(`[KEYBOARD] Typing line ${lastTypedLineIndex + 1}/${lines.length}`);
             lastTypedLineIndex++;
@@ -667,10 +689,10 @@ function setupGeneralIpcHandlers() {
         }
 
         try {
-            // Allow 250ms for the user to release the hotkeys (Ctrl+Alt+Space) 
+            // Allow 250ms for the user to release the hotkeys (Ctrl+Alt+Space)
             // before SendInput starts firing, otherwise modifier keys interfere with typing.
             await new Promise(resolve => setTimeout(resolve, 250));
-            
+
             if (typingCancelled) {
                 return false;
             }
@@ -679,17 +701,19 @@ function setupGeneralIpcHandlers() {
             const textFile = path.join(os.tmpdir(), `ultron_text_${timestamp}.txt`);
             const pauseFile = path.join(os.tmpdir(), 'ultron_pause.flag');
             const stopFile = path.join(os.tmpdir(), 'ultron_stop.flag');
-            
-            try { fs.unlinkSync(pauseFile); } catch(e) {}
-            try { fs.unlinkSync(stopFile); } catch(e) {}
+
+            try {
+                fs.unlinkSync(pauseFile);
+            } catch (e) {}
+            try {
+                fs.unlinkSync(stopFile);
+            } catch (e) {}
 
             console.log(`[KEYBOARD] Typing text via AutoTyper.exe (${text.length} chars, mode: ${mode})`);
             fs.writeFileSync(textFile, text, 'utf8');
 
             const { execFile } = require('child_process');
-            const autoTyperPath = app.isPackaged
-                ? path.join(process.resourcesPath, 'AutoTyper.exe')
-                : path.join(__dirname, 'utils', 'AutoTyper.exe');
+            const autoTyperPath = app.isPackaged ? path.join(process.resourcesPath, 'AutoTyper.exe') : path.join(__dirname, 'utils', 'AutoTyper.exe');
 
             console.log(`[KEYBOARD] Executing native AutoTyper: ${autoTyperPath}`);
 
@@ -706,7 +730,9 @@ function setupGeneralIpcHandlers() {
                 const child = execFile(autoTyperPath, [textFile, mode], (error, stdout, stderr) => {
                     activeTypingProcess = null;
                     globalShortcut.unregister('Escape');
-                    try { fs.unlinkSync(textFile); } catch(e) {}
+                    try {
+                        fs.unlinkSync(textFile);
+                    } catch (e) {}
 
                     if (error) {
                         if (error.signal === 'SIGTERM') {
@@ -736,7 +762,9 @@ function setupGeneralIpcHandlers() {
     ipcMain.handle('keyboard:pause-typing', async () => {
         if (activeTypingProcess) {
             const pauseFile = path.join(os.tmpdir(), 'ultron_pause.flag');
-            try { fs.writeFileSync(pauseFile, 'paused', 'utf8'); } catch(e) {}
+            try {
+                fs.writeFileSync(pauseFile, 'paused', 'utf8');
+            } catch (e) {}
             console.log('[KEYBOARD] Pausing active typing process');
             return true;
         }
@@ -747,7 +775,9 @@ function setupGeneralIpcHandlers() {
     ipcMain.handle('keyboard:resume-typing', async () => {
         if (activeTypingProcess) {
             const pauseFile = path.join(os.tmpdir(), 'ultron_pause.flag');
-            try { fs.unlinkSync(pauseFile); } catch(e) {}
+            try {
+                fs.unlinkSync(pauseFile);
+            } catch (e) {}
             console.log('[KEYBOARD] Resuming active typing process');
             return true;
         }
@@ -759,7 +789,9 @@ function setupGeneralIpcHandlers() {
         if (activeTypingProcess) {
             console.log('[KEYBOARD] Killing active typing process');
             const stopFile = path.join(os.tmpdir(), 'ultron_stop.flag');
-            try { fs.writeFileSync(stopFile, 'stopped', 'utf8'); } catch(e) {}
+            try {
+                fs.writeFileSync(stopFile, 'stopped', 'utf8');
+            } catch (e) {}
             activeTypingProcess.kill();
             activeTypingProcess = null;
             return true;
@@ -773,23 +805,20 @@ function setupGeneralIpcHandlers() {
             console.log(`[KEYBOARD] Pasting text via clipboard (${text.length} chars)`);
             const previousText = clipboard.readText();
             clipboard.writeText(text);
-            
+
             const psCommand = `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v')`;
-            
+
             return new Promise((resolve, reject) => {
-                execFile('powershell.exe', ['-NoProfile', '-Command', psCommand], 
-                    { timeout: 5000 }, 
-                    (error, stdout, stderr) => {
-                        setTimeout(() => {
-                            clipboard.writeText(previousText || '');
-                        }, 250);
-                        if (error) {
-                            reject(error);
-                        } else {
-                            resolve(true);
-                        }
+                execFile('powershell.exe', ['-NoProfile', '-Command', psCommand], { timeout: 5000 }, (error, stdout, stderr) => {
+                    setTimeout(() => {
+                        clipboard.writeText(previousText || '');
+                    }, 250);
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve(true);
                     }
-                );
+                });
             });
         } catch (error) {
             console.error('[KEYBOARD] Clipboard paste failed:', error.message);

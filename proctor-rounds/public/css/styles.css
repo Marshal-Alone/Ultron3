@@ -73,7 +73,11 @@ html {
 }
 
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family:
+        'Inter',
+        -apple-system,
+        BlinkMacSystemFont,
+        sans-serif;
     background: var(--bg-deepest);
     color: var(--text-primary);
     line-height: 1.6;
@@ -308,8 +312,15 @@ label {
 }
 
 @keyframes pulse-live {
-    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-    50% { opacity: 0.6; box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    0%,
+    100% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+    }
+    50% {
+        opacity: 0.6;
+        box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+    }
 }
 
 /* ── Monitoring Banner ───────────────────────────────────────────────── */
@@ -334,8 +345,13 @@ label {
 }
 
 @keyframes banner-shimmer {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
+    0%,
+    100% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -857,7 +873,9 @@ label {
 .event-card.severity-alert {
     border-left: 3px solid var(--severity-alert);
     background: var(--severity-alert-bg);
-    animation: eventSlideIn 0.25s ease-out, alertFlash 0.6s ease-out;
+    animation:
+        eventSlideIn 0.25s ease-out,
+        alertFlash 0.6s ease-out;
 }
 
 .event-card .event-icon {
@@ -1063,8 +1081,12 @@ label {
 }
 
 @keyframes alertFlash {
-    0% { background-color: rgba(239, 68, 68, 0.25); }
-    100% { background-color: var(--severity-alert-bg); }
+    0% {
+        background-color: rgba(239, 68, 68, 0.25);
+    }
+    100% {
+        background-color: var(--severity-alert-bg);
+    }
 }
 
 @keyframes toastSlideIn {
@@ -1090,7 +1112,9 @@ label {
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* ── Utility ─────────────────────────────────────────────────────────── */

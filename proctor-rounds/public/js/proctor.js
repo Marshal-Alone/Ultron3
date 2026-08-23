@@ -189,7 +189,7 @@ function connectSocket() {
         disconnectedOverlay.classList.add('active');
     });
 
-    socket.on('session_info', (info) => {
+    socket.on('session_info', info => {
         metaCandidate.textContent = info.candidateName || '—';
         metaSessionId.textContent = info.sessionId || '—';
         metaStatus.textContent = capitalize(info.status || 'waiting');
@@ -207,7 +207,7 @@ function connectSocket() {
         }
     });
 
-    socket.on('session_status', (data) => {
+    socket.on('session_status', data => {
         metaStatus.textContent = capitalize(data.status);
         if (data.status === 'active' && data.startedAt) {
             sessionStartTime = new Date(data.startedAt);
@@ -224,21 +224,21 @@ function connectSocket() {
         }
     });
 
-    socket.on('editor_sync', (snapshot) => {
+    socket.on('editor_sync', snapshot => {
         updateEditorContent(snapshot.content || '');
     });
 
-    socket.on('event', (event) => {
+    socket.on('event', event => {
         processEvent(event);
     });
 
-    socket.on('event_history', (history) => {
+    socket.on('event_history', history => {
         for (const event of history) {
             processEvent(event, true);
         }
     });
 
-    socket.on('error_msg', (data) => {
+    socket.on('error_msg', data => {
         alert(data.message);
         window.location.href = '/lobby.html';
     });
@@ -372,14 +372,14 @@ function playAlertSound() {
 // ── Filter buttons ──────────────────────────────────────────────────────
 function setupFilters() {
     const filterBtns = document.querySelectorAll('.filter-btn');
-    filterBtns.forEach((btn) => {
+    filterBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-            filterBtns.forEach((b) => b.classList.remove('active'));
+            filterBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             activeFilter = btn.dataset.filter;
 
             // Apply filter to existing cards
-            document.querySelectorAll('.event-card').forEach((card) => {
+            document.querySelectorAll('.event-card').forEach(card => {
                 if (activeFilter === 'all' || card.dataset.severity === activeFilter) {
                     card.style.display = '';
                 } else {

@@ -56,12 +56,12 @@ function setupIpcHandlers() {
         geminiService.onTranscript = (transcript, speakerId) => {
             const label = speakerId === 1 ? 'Interviewer' : 'Candidate';
             console.log(`[Transcript] [${label}]: ${transcript}`);
-            
+
             // Trigger simultaneous Groq answer
             groqService.generateAnswer(`[${label}]: ${transcript}`);
         };
 
-        geminiService.onStatus = (status) => {
+        geminiService.onStatus = status => {
             mainWindow?.webContents.send('update-status', status);
         };
 
@@ -70,11 +70,11 @@ function setupIpcHandlers() {
             systemPrompt: customPrompt || 'You are an ultra-fast on-screen assistant. Give direct, ready-to-speak answers in 1-3 bullet points.',
         });
 
-        groqService.onToken = (tokenText) => {
+        groqService.onToken = tokenText => {
             mainWindow?.webContents.send('update-response', tokenText);
         };
 
-        groqService.onComplete = (finalText) => {
+        groqService.onComplete = finalText => {
             geminiService.saveTurn('User Context', finalText);
         };
 

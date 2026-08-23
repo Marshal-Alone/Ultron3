@@ -2,7 +2,7 @@
 
 ## 1. High-Performance Token Streaming & Markdown Rendering
 
-When tokens stream in at 30–50 words per second from Groq or Gemini Live, re-parsing the entire DOM indiscriminately causes screen flicker, lost scroll position, and UI lag. 
+When tokens stream in at 30–50 words per second from Groq or Gemini Live, re-parsing the entire DOM indiscriminately causes screen flicker, lost scroll position, and UI lag.
 
 The frontend uses an optimized Markdown pipeline combining `marked.js` with word-wrapping and smooth DOM updates:
 
@@ -102,7 +102,7 @@ function startWaveformAnimation(canvas) {
     const ctx = canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
-    
+
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
@@ -113,7 +113,7 @@ function startWaveformAnimation(canvas) {
 
     const waves = [
         { freq: 3, amp: 0.35, speed: 2.5, opacity: 0.9, width: 1.8 },
-        { freq: 5, amp: 0.20, speed: 3.5, opacity: 0.5, width: 1.2 },
+        { freq: 5, amp: 0.2, speed: 3.5, opacity: 0.5, width: 1.2 },
         { freq: 7, amp: 0.12, speed: 5.0, opacity: 0.3, width: 0.8 },
     ];
 
@@ -159,13 +159,13 @@ Users can select between three listening modes depending on their environment:
 ```javascript
 const AudioModes = {
     SPEAKER_ONLY: 'speaker_only', // Only transcribe what the other party is saying through speakers
-    MIC_ONLY:     'mic_only',     // Only transcribe what the user says into microphone
-    BOTH:         'both',         // Transcribe both speakers and user simultaneously
+    MIC_ONLY: 'mic_only', // Only transcribe what the user says into microphone
+    BOTH: 'both', // Transcribe both speakers and user simultaneously
 };
 
 async function applyAudioMode(mode) {
     await storage.updatePreference('audioMode', mode);
-    
+
     // When both or mic is selected, activate getUserMedia in parallel with getDisplayMedia
     if (mode === AudioModes.MIC_ONLY || mode === AudioModes.BOTH) {
         startMicrophoneStream();

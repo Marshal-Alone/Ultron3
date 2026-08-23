@@ -22,8 +22,8 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         transparent: true,
         hasShadow: false,
         alwaysOnTop: true,
-        focusable: true,       // Allow keyboard input by default (stealth mode can disable)
-        skipTaskbar: true,     // Don't show in taskbar
+        focusable: true, // Allow keyboard input by default (stealth mode can disable)
+        skipTaskbar: true, // Don't show in taskbar
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false, // TODO: change to true
@@ -38,7 +38,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
 
     // // Disable zoom functionality completely to prevent Ctrl+= from enlarging UI
     // mainWindow.webContents.on('before-input-event', (event, input) => {
-    //     // Block Ctrl++ (or Cmd++ on Mac) - prevents zoom increase  
+    //     // Block Ctrl++ (or Cmd++ on Mac) - prevents zoom increase
     //     if ((input.control || input.meta) && input.key.toLowerCase() === '+') {
     //         event.preventDefault();
     //     }
@@ -59,13 +59,13 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     // // Reset zoom level to 100% (fix for Ctrl+= browser zoom that enlarges entire UI)
     // mainWindow.webContents.setZoomLevel(0); // 0 = 100% zoom
     // console.log('[WINDOW] Zoom level reset to 100%');
-    
+
     // // Force zoom reset after content loads to ensure it takes effect
     // mainWindow.webContents.on('did-finish-load', () => {
     //     mainWindow.webContents.setZoomLevel(0);
     //     console.log('[WINDOW] Zoom reset confirmed after content load');
     // });
-    
+
     // // Also force zoom reset on every navigation
     // mainWindow.webContents.on('did-navigate', () => {
     //     mainWindow.webContents.setZoomLevel(0);
@@ -84,7 +84,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     // Enable window resizing - user can drag corners/edges to resize
     mainWindow.setResizable(true);
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    
+
     // Validate and set window position
     let x = savedBounds.x;
     let y = savedBounds.y;
@@ -98,10 +98,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         const displays = screen.getAllDisplays();
         for (const display of displays) {
             const bounds = display.bounds;
-            if (
-                x >= bounds.x && x + windowWidth <= bounds.x + bounds.width &&
-                y >= bounds.y && y + windowHeight <= bounds.y + bounds.height
-            ) {
+            if (x >= bounds.x && x + windowWidth <= bounds.x + bounds.width && y >= bounds.y && y + windowHeight <= bounds.y + bounds.height) {
                 isVisible = true;
                 break;
             }
@@ -123,7 +120,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
             x: bounds.x,
             y: bounds.y,
             width: bounds.width,
-            height: bounds.height
+            height: bounds.height,
         });
     };
 
@@ -198,6 +195,7 @@ function getDefaultKeybinds() {
         decreaseWidth: isMac ? 'Cmd+Shift+Left' : 'Ctrl+Shift+Left',
         increaseHeight: isMac ? 'Cmd+Alt+Up' : 'Ctrl+Alt+Up',
         decreaseHeight: isMac ? 'Cmd+Alt+Down' : 'Ctrl+Alt+Down',
+        toggleListenAnswer: isMac ? 'Cmd+Space' : 'Ctrl+Space',
         // Invigilator Mode hotkeys
         toggleInvigilatorMode: isMac ? 'Cmd+Alt+M' : 'Ctrl+Alt+M',
         triggerAnswerCapture: isMac ? 'Cmd+Alt+A' : 'Ctrl+Alt+A',
@@ -209,8 +207,6 @@ function getDefaultKeybinds() {
 }
 
 function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessionRef) {
-    console.log('Updating global shortcuts with:', keybinds);
-
     // Unregister all existing shortcuts
     globalShortcut.unregisterAll();
 
@@ -248,7 +244,6 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
         if (keybind) {
             try {
                 globalShortcut.register(keybind, movementActions[action]);
-                console.log(`Registered ${action}: ${keybind}`);
             } catch (error) {
                 console.error(`Failed to register ${action} (${keybind}):`, error);
             }
@@ -265,7 +260,6 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
                     mainWindow.showInactive();
                 }
             });
-            console.log(`Registered toggleVisibility: ${keybinds.toggleVisibility}`);
         } catch (error) {
             console.error(`Failed to register toggleVisibility (${keybinds.toggleVisibility}):`, error);
         }
@@ -278,14 +272,11 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
                 mouseEventsIgnored = !mouseEventsIgnored;
                 if (mouseEventsIgnored) {
                     mainWindow.setIgnoreMouseEvents(true, { forward: true });
-                    console.log('Mouse events ignored');
                 } else {
                     mainWindow.setIgnoreMouseEvents(false);
-                    console.log('Mouse events enabled');
                 }
                 mainWindow.webContents.send('click-through-toggled', mouseEventsIgnored);
             });
-            console.log(`Registered toggleClickThrough: ${keybinds.toggleClickThrough}`);
         } catch (error) {
             console.error(`Failed to register toggleClickThrough (${keybinds.toggleClickThrough}):`, error);
         }
@@ -294,56 +285,29 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     // Register next step shortcut (either starts session or takes screenshot based on view)
     if (keybinds.nextStep) {
         const nextStepHandler = async () => {
-            console.log('=== NEXT STEP SHORTCUT TRIGGERED ===');
             try {
                 const isMac = process.platform === 'darwin';
                 const shortcutKey = isMac ? 'cmd+enter' : 'ctrl+enter';
-                console.log('Executing JavaScript in renderer...');
                 await mainWindow.webContents.executeJavaScript(`
-                    console.log('Shortcut received in renderer');
                     cheatingDaddy.handleShortcut('${shortcutKey}');
                 `);
-                console.log('JavaScript execution completed');
             } catch (error) {
                 console.error('Error handling next step shortcut:', error);
             }
         };
 
         try {
-            // Try different formats for the shortcut
             let keybind = keybinds.nextStep;
             let registered = globalShortcut.register(keybind, nextStepHandler);
 
-            // If Ctrl+Enter failed, try alternative formats
             if (!registered) {
-                console.log(`${keybind} failed, trying alternatives...`);
-
-                // Try CommandOrControl+Return
                 registered = globalShortcut.register('CommandOrControl+Return', nextStepHandler);
-                if (registered) {
-                    console.log('Registered nextStep with: CommandOrControl+Return');
-                }
-
-                // Try F9 as fallback (commonly available)
                 if (!registered) {
                     registered = globalShortcut.register('F9', nextStepHandler);
-                    if (registered) {
-                        console.log('Registered nextStep with fallback: F9');
+                    if (!registered) {
+                        registered = globalShortcut.register('Ctrl+Shift+A', nextStepHandler);
                     }
                 }
-
-                // Try Ctrl+Shift+A as another fallback
-                if (!registered) {
-                    registered = globalShortcut.register('Ctrl+Shift+A', nextStepHandler);
-                    if (registered) {
-                        console.log('Registered nextStep with fallback: Ctrl+Shift+A');
-                    }
-                }
-            }
-
-            console.log(`Registered nextStep: ${keybinds.nextStep} - success: ${registered}`);
-            if (!registered) {
-                console.warn('WARNING: Could not register any nextStep shortcut! Try pressing F9 or change in Settings.');
             }
         } catch (error) {
             console.error(`Failed to register nextStep (${keybinds.nextStep}):`, error);
@@ -354,10 +318,8 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.previousResponse) {
         try {
             globalShortcut.register(keybinds.previousResponse, () => {
-                console.log('Previous response shortcut triggered');
                 sendToRenderer('navigate-previous-response');
             });
-            console.log(`Registered previousResponse: ${keybinds.previousResponse}`);
         } catch (error) {
             console.error(`Failed to register previousResponse (${keybinds.previousResponse}):`, error);
         }
@@ -367,10 +329,8 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.nextResponse) {
         try {
             globalShortcut.register(keybinds.nextResponse, () => {
-                console.log('Next response shortcut triggered');
                 sendToRenderer('navigate-next-response');
             });
-            console.log(`Registered nextResponse: ${keybinds.nextResponse}`);
         } catch (error) {
             console.error(`Failed to register nextResponse (${keybinds.nextResponse}):`, error);
         }
@@ -380,16 +340,23 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.scrollUp) {
         try {
             globalShortcut.register(keybinds.scrollUp, () => {
-                console.log('Scroll up shortcut triggered');
                 sendToRenderer('scroll-response-up');
             });
-            console.log(`Registered scrollUp: ${keybinds.scrollUp}`);
         } catch (error) {
             console.error(`Failed to register scrollUp (${keybinds.scrollUp}):`, error);
         }
     }
 
     // Register scroll down shortcut
+    if (keybinds.scrollDown) {
+        try {
+            globalShortcut.register(keybinds.scrollDown, () => {
+                sendToRenderer('scroll-response-down');
+            });
+        } catch (error) {
+            console.error(`Failed to register scrollDown (${keybinds.scrollDown}):`, error);
+        }
+    }
     if (keybinds.scrollDown) {
         try {
             globalShortcut.register(keybinds.scrollDown, () => {
@@ -423,7 +390,6 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
                     }, 300);
                 }
             });
-            console.log(`Registered emergencyErase: ${keybinds.emergencyErase}`);
         } catch (error) {
             console.error(`Failed to register emergencyErase (${keybinds.emergencyErase}):`, error);
         }
@@ -431,26 +397,19 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 
     // Register toggle AI provider shortcut (Ctrl+Alt+Enter)
     try {
-        const registered = globalShortcut.register('Ctrl+Alt+Return', async () => {
-            console.log('Toggle AI provider shortcut triggered');
+        globalShortcut.register('Ctrl+Alt+Return', async () => {
             try {
                 const storage = require('../storage');
                 const prefs = storage.getPreferences();
                 const currentProvider = prefs.aiProvider || 'gemini';
                 const newProvider = currentProvider === 'gemini' ? 'groq' : 'gemini';
 
-                // Update the preference
                 storage.updatePreference('aiProvider', newProvider);
-
-                console.log(`Switched AI provider from ${currentProvider} to ${newProvider}`);
-
-                // Notify the renderer to update UI
                 sendToRenderer('ai-provider-changed', newProvider);
             } catch (error) {
                 console.error('Error toggling AI provider:', error);
             }
         });
-        console.log(`Registered toggleAiProvider: Ctrl+Alt+Enter - success: ${registered}`);
     } catch (error) {
         console.error('Failed to register toggleAiProvider:', error);
     }
@@ -459,12 +418,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.decreaseTransparency) {
         try {
             globalShortcut.register(keybinds.decreaseTransparency, () => {
-                console.log('Decrease transparency shortcut triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
                     mainWindow.webContents.send('adjust-transparency', -0.02);
                 }
             });
-            console.log(`Registered decreaseTransparency: ${keybinds.decreaseTransparency}`);
         } catch (error) {
             console.error(`Failed to register decreaseTransparency:`, error);
         }
@@ -473,12 +430,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.increaseTransparency) {
         try {
             globalShortcut.register(keybinds.increaseTransparency, () => {
-                console.log('Increase transparency shortcut triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
                     mainWindow.webContents.send('adjust-transparency', 0.02);
                 }
             });
-            console.log(`Registered increaseTransparency: ${keybinds.increaseTransparency}`);
         } catch (error) {
             console.error(`Failed to register increaseTransparency:`, error);
         }
@@ -488,12 +443,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.decreaseFontSize) {
         try {
             globalShortcut.register(keybinds.decreaseFontSize, () => {
-                console.log('Decrease font size shortcut triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
                     mainWindow.webContents.send('adjust-font-size', -2);
                 }
             });
-            console.log(`Registered decreaseFontSize: ${keybinds.decreaseFontSize}`);
         } catch (error) {
             console.error(`Failed to register decreaseFontSize:`, error);
         }
@@ -502,12 +455,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.increaseFontSize) {
         try {
             globalShortcut.register(keybinds.increaseFontSize, () => {
-                console.log('Increase font size shortcut triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
                     mainWindow.webContents.send('adjust-font-size', 2);
                 }
             });
-            console.log(`Registered increaseFontSize: ${keybinds.increaseFontSize}`);
         } catch (error) {
             console.error(`Failed to register increaseFontSize:`, error);
         }
@@ -517,12 +468,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.decreaseTextOpacity) {
         try {
             globalShortcut.register(keybinds.decreaseTextOpacity, () => {
-                console.log('Decrease text opacity shortcut triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
                     mainWindow.webContents.send('adjust-text-opacity', -0.02);
                 }
             });
-            console.log(`Registered decreaseTextOpacity: ${keybinds.decreaseTextOpacity}`);
         } catch (error) {
             console.error(`Failed to register decreaseTextOpacity:`, error);
         }
@@ -531,12 +480,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.increaseTextOpacity) {
         try {
             globalShortcut.register(keybinds.increaseTextOpacity, () => {
-                console.log('Increase text opacity shortcut triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
                     mainWindow.webContents.send('adjust-text-opacity', 0.02);
                 }
             });
-            console.log(`Registered increaseTextOpacity: ${keybinds.increaseTextOpacity}`);
         } catch (error) {
             console.error(`Failed to register increaseTextOpacity:`, error);
         }
@@ -548,13 +495,11 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             globalShortcut.register(keybinds.askClipboard, () => {
                 const text = clipboard.readText();
                 if (text && text.trim().length > 0) {
-                    console.log('Stealth Clipboard Ask triggered');
                     if (mainWindow && !mainWindow.isDestroyed()) {
                         mainWindow.webContents.send('clipboard-query', text);
                     }
                 }
             });
-            console.log(`Registered askClipboard: ${keybinds.askClipboard}`);
         } catch (error) {
             console.error(`Failed to register askClipboard:`, error);
         }
@@ -570,13 +515,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
                 mainWindow.setFocusable(newMode);
                 mainWindow.setIgnoreMouseEvents(!newMode);
 
-                console.log('Stealth Mode:', newMode ? 'OFF (Normal)' : 'ON (Locked/Unfocusable)');
-
                 if (mainWindow && !mainWindow.isDestroyed()) {
                     mainWindow.webContents.send('stealth-mode-changed', !newMode);
                 }
             });
-            console.log(`Registered toggleStealth: ${keybinds.toggleStealth}`);
         } catch (error) {
             console.error(`Failed to register toggleStealth:`, error);
         }
@@ -586,10 +528,8 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.toggleNavbar) {
         try {
             globalShortcut.register(keybinds.toggleNavbar, () => {
-                console.log('=== TOGGLE NAVBAR ===');
                 sendToRenderer('toggle-navbar');
             });
-            console.log(`Registered toggleNavbar: ${keybinds.toggleNavbar}`);
         } catch (error) {
             console.error(`Failed to register toggleNavbar:`, error);
         }
@@ -608,9 +548,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
                 const [width, height] = mainWindow.getSize();
                 mainWindow.setSize(width + resizeIncrement, height);
                 storage.setWindowSize(width + resizeIncrement, height);
-                console.log(`Window width increased to ${width + resizeIncrement}px`);
             });
-            console.log(`Registered increaseWidth: ${keybinds.increaseWidth}`);
         } catch (error) {
             console.error(`Failed to register increaseWidth:`, error);
         }
@@ -625,9 +563,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
                 const newWidth = Math.max(200, width - resizeIncrement); // Min width 200px
                 mainWindow.setSize(newWidth, height);
                 storage.setWindowSize(newWidth, height);
-                console.log(`Window width decreased to ${newWidth}px`);
             });
-            console.log(`Registered decreaseWidth: ${keybinds.decreaseWidth}`);
         } catch (error) {
             console.error(`Failed to register decreaseWidth:`, error);
         }
@@ -641,9 +577,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
                 const [width, height] = mainWindow.getSize();
                 mainWindow.setSize(width, height + resizeIncrement);
                 storage.setWindowSize(width, height + resizeIncrement);
-                console.log(`Window height increased to ${height + resizeIncrement}px`);
             });
-            console.log(`Registered increaseHeight: ${keybinds.increaseHeight}`);
         } catch (error) {
             console.error(`Failed to register increaseHeight:`, error);
         }
@@ -658,9 +592,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
                 const newHeight = Math.max(200, height - resizeIncrement); // Min height 200px
                 mainWindow.setSize(width, newHeight);
                 storage.setWindowSize(width, newHeight);
-                console.log(`Window height decreased to ${newHeight}px`);
             });
-            console.log(`Registered decreaseHeight: ${keybinds.decreaseHeight}`);
         } catch (error) {
             console.error(`Failed to register decreaseHeight:`, error);
         }
@@ -673,22 +605,14 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     const quickStartGroqShortcut = isMac ? 'Cmd+Shift+S' : 'Ctrl+Shift+S';
     try {
         globalShortcut.register(quickStartGroqShortcut, async () => {
-            console.log('=== QUICK START GROQ SHORTCUT TRIGGERED ===');
             try {
                 const storage = require('../storage');
-                
-                // Set Groq as the provider
                 storage.updatePreference('aiProvider', 'groq');
-                console.log('AI Provider set to: groq');
-
-                // Notify renderer to start Groq session
                 sendToRenderer('quick-start-groq');
-                
             } catch (error) {
                 console.error('Error in quick start Groq:', error);
             }
         });
-        console.log(`Registered Quick Start Groq: ${quickStartGroqShortcut}`);
     } catch (error) {
         console.error(`Failed to register Quick Start Groq (${quickStartGroqShortcut}):`, error);
     }
@@ -697,40 +621,37 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     const killSwitchShortcut = isMac ? 'Cmd+Shift+Delete' : 'Ctrl+Shift+Delete';
     try {
         globalShortcut.register(killSwitchShortcut, async () => {
-            console.log('=== KILL SWITCH TRIGGERED ===');
             try {
                 const storage = require('../storage');
                 const { app } = require('electron');
 
-                // Get current session ID from renderer (if exists)
-                mainWindow.webContents.executeJavaScript(`
+                mainWindow.webContents
+                    .executeJavaScript(
+                        `
                     if (window.cheatingDaddy && window.cheatingDaddy.currentSessionId) {
                         window.electronbridge?.sendSync?.('kill-switch-export', window.cheatingDaddy.currentSessionId);
                     }
-                `).catch(err => console.log('Could not get session ID from renderer'));
+                `
+                    )
+                    .catch(err => console.log('Could not get session ID from renderer'));
 
-                // Brief delay to allow export
                 setTimeout(() => {
                     if (mainWindow && !mainWindow.isDestroyed()) {
                         mainWindow.hide();
                     }
 
-                    // Close any active AI sessions
                     if (geminiSessionRef.current) {
                         geminiSessionRef.current.close();
                         geminiSessionRef.current = null;
                     }
 
-                    console.log('Exiting application via kill switch');
-                    process.exit(0); // Hard exit - no cleanup needed
+                    process.exit(0);
                 }, 500);
-                
             } catch (error) {
                 console.error('Error in kill switch:', error);
-                process.exit(0); // Force exit on error
+                process.exit(0);
             }
         });
-        console.log(`Registered Kill Switch: ${killSwitchShortcut}`);
     } catch (error) {
         console.error(`Failed to register Kill Switch (${killSwitchShortcut}):`, error);
     }
@@ -739,16 +660,12 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     const quickStopShortcut = 'Alt+S';
     try {
         globalShortcut.register(quickStopShortcut, async () => {
-            console.log('=== QUICK STOP SHORTCUT TRIGGERED ===');
             try {
-                // Send stop signal to renderer to close capture session
                 sendToRenderer('quick-stop');
-                console.log('Quick stop signal sent to renderer');
             } catch (error) {
                 console.error('Error in quick stop:', error);
             }
         });
-        console.log(`Registered Quick Stop: ${quickStopShortcut}`);
     } catch (error) {
         console.error(`Failed to register Quick Stop (${quickStopShortcut}):`, error);
     }
@@ -759,13 +676,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.toggleInvigilatorMode) {
         try {
             globalShortcut.register(keybinds.toggleInvigilatorMode, () => {
-                console.log('[HOTKEYS] Toggle Invigilator Mode triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
-                    console.log('[HOTKEYS] Sending IPC: invigilator:toggle-mode');
                     sendToRenderer('invigilator:toggle-mode');
                 }
             });
-            console.log(`[HOTKEYS] Registered toggleInvigilatorMode: ${keybinds.toggleInvigilatorMode}`);
         } catch (error) {
             console.error(`[HOTKEYS] Failed to register toggleInvigilatorMode:`, error);
         }
@@ -775,13 +689,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.triggerAnswerCapture) {
         try {
             globalShortcut.register(keybinds.triggerAnswerCapture, () => {
-                console.log('[HOTKEYS] Trigger Answer Capture triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
-                    console.log('[HOTKEYS] Sending IPC: invigilator:capture-answer');
                     sendToRenderer('invigilator:capture-answer');
                 }
             });
-            console.log(`[HOTKEYS] Registered triggerAnswerCapture: ${keybinds.triggerAnswerCapture}`);
         } catch (error) {
             console.error(`[HOTKEYS] Failed to register triggerAnswerCapture:`, error);
         }
@@ -791,13 +702,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.confirmAutoType) {
         try {
             globalShortcut.register(keybinds.confirmAutoType, () => {
-                console.log('[HOTKEYS] Confirm Auto-Type triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
-                    console.log('[HOTKEYS] Sending IPC: invigilator:confirm-autotype');
                     sendToRenderer('invigilator:confirm-autotype');
                 }
             });
-            console.log(`[HOTKEYS] Registered confirmAutoType: ${keybinds.confirmAutoType}`);
         } catch (error) {
             console.error(`[HOTKEYS] Failed to register confirmAutoType:`, error);
         }
@@ -807,13 +715,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.toggleTypingMode) {
         try {
             globalShortcut.register(keybinds.toggleTypingMode, () => {
-                console.log('[HOTKEYS] Toggle Typing Mode triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
-                    console.log('[HOTKEYS] Sending IPC: invigilator:toggle-typing-mode');
                     sendToRenderer('invigilator:toggle-typing-mode');
                 }
             });
-            console.log(`[HOTKEYS] Registered toggleTypingMode: ${keybinds.toggleTypingMode}`);
         } catch (error) {
             console.error(`[HOTKEYS] Failed to register toggleTypingMode:`, error);
         }
@@ -823,13 +728,10 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.pauseResumeTyping) {
         try {
             globalShortcut.register(keybinds.pauseResumeTyping, () => {
-                console.log('[HOTKEYS] Pause/Resume Typing triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
-                    console.log('[HOTKEYS] Sending IPC: invigilator:pause-resume-typing');
                     sendToRenderer('invigilator:pause-resume-typing');
                 }
             });
-            console.log(`[HOTKEYS] Registered pauseResumeTyping: ${keybinds.pauseResumeTyping}`);
         } catch (error) {
             console.error(`[HOTKEYS] Failed to register pauseResumeTyping:`, error);
         }
@@ -839,17 +741,29 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.stopTyping) {
         try {
             globalShortcut.register(keybinds.stopTyping, () => {
-                console.log('[HOTKEYS] Stop Typing triggered');
                 if (mainWindow && !mainWindow.isDestroyed()) {
-                    console.log('[HOTKEYS] Sending IPC: invigilator:stop-typing');
                     sendToRenderer('invigilator:stop-typing');
                 }
             });
-            console.log(`[HOTKEYS] Registered stopTyping: ${keybinds.stopTyping}`);
         } catch (error) {
             console.error(`[HOTKEYS] Failed to register stopTyping:`, error);
         }
     }
+
+    // Register Toggle Listen & Answer shortcut (Ctrl+Space / Cmd+Space)
+    if (keybinds.toggleListenAnswer) {
+        try {
+            globalShortcut.register(keybinds.toggleListenAnswer, () => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    sendToRenderer('toggle-listen-answer');
+                }
+            });
+        } catch (error) {
+            console.error(`[HOTKEYS] Failed to register toggleListenAnswer (${keybinds.toggleListenAnswer}):`, error);
+        }
+    }
+
+    console.log('[SYSTEM] Shortcuts registered successfully');
 }
 
 function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
@@ -897,7 +811,7 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
         }
     });
 
-    ipcMain.handle('toggle-window-visibility', async (event) => {
+    ipcMain.handle('toggle-window-visibility', async event => {
         try {
             if (mainWindow.isDestroyed()) {
                 return { success: false, error: 'Window has been destroyed' };
@@ -916,9 +830,8 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
     });
 
     function animateWindowResize(mainWindow, targetWidth, targetHeight, layoutMode) {
-        return new Promise((resolve) => {
+        return new Promise(resolve => {
             if (mainWindow.isDestroyed()) {
-                console.log('Cannot animate resize: window has been destroyed');
                 resolve();
                 return;
             }
@@ -931,12 +844,9 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
             const [startWidth, startHeight] = mainWindow.getSize();
 
             if (startWidth === targetWidth && startHeight === targetHeight) {
-                console.log(`Window already at target size for ${layoutMode} mode`);
                 resolve();
                 return;
             }
-
-            console.log(`Starting animated resize from ${startWidth}x${startHeight} to ${targetWidth}x${targetHeight}`);
 
             windowResizing = true;
             mainWindow.setResizable(true);
@@ -981,14 +891,13 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
                         mainWindow.setPosition(finalX, 0);
                     }
 
-                    console.log(`Animation complete: ${targetWidth}x${targetHeight}`);
                     resolve();
                 }
             }, 1000 / frameRate);
         });
     }
 
-    ipcMain.handle('update-sizes', async (event) => {
+    ipcMain.handle('update-sizes', async event => {
         try {
             if (mainWindow.isDestroyed()) {
                 return { success: false, error: 'Window has been destroyed' };
@@ -999,17 +908,14 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
                 viewName = await event.sender.executeJavaScript('cheatingDaddy.getCurrentView()');
                 layoutMode = await event.sender.executeJavaScript('cheatingDaddy.getLayoutMode()');
             } catch (error) {
-                console.warn('Failed to get view/layout from renderer, using defaults:', error);
                 viewName = 'main';
                 layoutMode = 'normal';
             }
 
-            console.log('Size update requested for view:', viewName, 'layout:', layoutMode);
-
             const prefs = storage.getPreferences();
             let targetWidth, targetHeight;
-            const baseWidth = layoutMode === 'compact' ? 700 : (prefs.windowWidth || 509);
-            const baseHeight = layoutMode === 'compact' ? 500 : (prefs.windowHeight || 352);
+            const baseWidth = layoutMode === 'compact' ? 700 : prefs.windowWidth || 509;
+            const baseHeight = layoutMode === 'compact' ? 500 : prefs.windowHeight || 352;
 
             switch (viewName) {
                 case 'main':
@@ -1035,13 +941,6 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
                     targetWidth = baseWidth;
                     targetHeight = baseHeight;
                     break;
-            }
-
-            const [currentWidth, currentHeight] = mainWindow.getSize();
-            console.log('Current window size:', currentWidth, 'x', currentHeight);
-
-            if (windowResizing) {
-                console.log('Interrupting current resize animation');
             }
 
             await animateWindowResize(mainWindow, targetWidth, targetHeight, `${viewName} view (${layoutMode})`);
