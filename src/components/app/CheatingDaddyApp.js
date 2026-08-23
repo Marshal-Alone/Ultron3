@@ -190,6 +190,7 @@ export class CheatingDaddyApp extends LitElement {
             this.selectedScreenshotInterval = prefs.selectedScreenshotInterval || '5';
             this.selectedImageQuality = prefs.selectedImageQuality || 'medium';
             this.layoutMode = config.layout || 'normal';
+            this.isNavbarHidden = prefs.isNavbarHidden || false;
 
             // Load invigilator mode preferences
             const invigilatorTypingMode = prefs.invigilatorTypingMode || 'charByChar';
@@ -309,7 +310,6 @@ export class CheatingDaddyApp extends LitElement {
         root.style.setProperty('--input-focus-background', `rgba(${tertiary.r}, ${tertiary.g}, ${tertiary.b}, ${alpha})`);
         root.style.setProperty('--hover-background', `rgba(${hover.r}, ${hover.g}, ${hover.b}, ${alpha})`);
         root.style.setProperty('--scrollbar-background', `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, ${alpha})`);
-        root.style.setProperty('--text-opacity', alpha);
     }
 
     // Keep old function name for backwards compatibility
@@ -360,6 +360,13 @@ export class CheatingDaddyApp extends LitElement {
             });
             ipcRenderer.on('toggle-navbar', () => {
                 this.isNavbarHidden = !this.isNavbarHidden;
+                if (window.require) {
+                    try {
+                        cheatingDaddy.storage.updatePreference('isNavbarHidden', this.isNavbarHidden);
+                    } catch (error) {
+                        console.warn('[App] Failed to save navbar preference:', error);
+                    }
+                }
                 this.requestUpdate();
             });
             

@@ -16,6 +16,7 @@ export class MainView extends LitElement {
             width: 100%;
             max-width: 480px;
             padding: 8px 0;
+            opacity: var(--text-opacity, 1);
         }
 
         .welcome {

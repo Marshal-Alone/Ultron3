@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Proctor Rounds — Candidate coding editor with live monitoring." />
+    <title>Proctor Rounds — Candidate</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <!-- CodeMirror 6 via CDN -->
+    <script type="module" src="/js/candidate.js"></script>
+</head>
+<body>
+    <!-- Consent Overlay -->
+    <div class="consent-overlay" id="consentOverlay">
+        <div class="consent-card glass-panel">
+            <div class="consent-icon">🔒</div>
+            <h2>Monitoring Disclosure</h2>
+            <p>This coding assessment session is live-monitored for integrity purposes.</p>
+            <ul>
+                <li>Your code editor activity is being captured</li>
+                <li>Tab and window switches are logged</li>
+                <li>Paste and copy actions are recorded (metadata only)</li>
+                <li>A proctor is watching this session in real time</li>
+                <li>No webcam, microphone, or screen recording is used</li>
+                <li>No activity outside this browser tab is captured</li>
+            </ul>
+            <label class="consent-check">
+                <input type="checkbox" id="consentCheckbox" />
+                I understand and consent to monitoring during this session
+            </label>
+            <button id="consentStartBtn" class="btn btn-primary" disabled style="width: 100%;">
+                Begin Session
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Candidate Layout -->
+    <div class="candidate-layout" id="candidateLayout" style="display: none;">
+        <!-- Monitoring Banner -->
+        <div class="monitor-banner">
+            <span class="icon">🔴</span>
+            <span>This session is being monitored and logged</span>
+        </div>
+
+        <!-- Header -->
+        <div class="candidate-header">
+            <div class="candidate-header-left">
+                <h1 id="sessionTitle">Coding Assessment</h1>
+                <span class="badge badge-live">
+                    <span class="live-dot"></span> LIVE
+                </span>
+            </div>
+            <div class="candidate-header-right">
+                <select class="lang-selector" id="langSelector">
+                    <option value="javascript">JavaScript</option>
+                    <option value="python">Python</option>
+                    <option value="java">Java</option>
+                    <option value="cpp">C++</option>
+                    <option value="go">Go</option>
+                    <option value="rust">Rust</option>
+                    <option value="typescript">TypeScript</option>
+                </select>
+                <div class="timer-display" id="timerDisplay">00:00:00</div>
+            </div>
+        </div>
+
+        <!-- Session Ended Banner -->
+        <div class="session-ended-banner" id="sessionEndedBanner">
+            <span>✅</span>
+            <span>Session has ended. Thank you for participating.</span>
+        </div>
+
+        <!-- Editor -->
+        <div class="editor-area" id="editorContainer"></div>
+    </div>
+
+    <!-- Disconnected Overlay -->
+    <div class="disconnected-overlay" id="disconnectedOverlay">
+        <div class="disconnected-box">
+            <div class="disc-icon">📡</div>
+            <h2>Connection Lost</h2>
+            <p>Attempting to reconnect…</p>
+            <div class="spinner"></div>
+        </div>
+    </div>
+</body>
+</html>

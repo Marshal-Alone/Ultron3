@@ -21,7 +21,21 @@ function createMainWindow() {
     return mainWindow;
 }
 
-app.whenReady().then(async () => {
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+    app.quit();
+} else {
+    app.on('second-instance', (event, commandLine, workingDirectory) => {
+        // Someone tried to run a second instance, we should focus our existing window.
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            if (!mainWindow.isVisible()) mainWindow.showInactive();
+            mainWindow.focus();
+        }
+    });
+
+    app.whenReady().then(async () => {
     // Initialize storage (checks version, resets if needed)
     storage.initializeStorage();
 
@@ -75,6 +89,7 @@ app.on('activate', () => {
         createMainWindow();
     }
 });
+} // Close the 'else' block from requestSingleInstanceLock
 
 function setupStorageIpcHandlers() {
     // ============ CONFIG ============
@@ -450,8 +465,14 @@ function setupGeneralIpcHandlers() {
                 if (ch == '\\t') { SendVk(0x09); return; }
 
                 short vkCode = KeyMap.VkKeyScan(ch);
-                if (vkCode == -1) {
-                    // Fallback to unicode for unknown characters
+                
+                // SAFETY: If VkKeyScan wants Ctrl (0x0200) or Alt (0x0400),
+                // use Unicode injection instead to avoid triggering shortcuts.
+                bool needsCtrl = (vkCode & 0x0200) != 0;
+                bool needsAlt  = (vkCode & 0x0400) != 0;
+                
+                if (vkCode == -1 || needsCtrl || needsAlt) {
+                    // Safe Unicode injection — never triggers any shortcut
                     INPUT[] uInputs = new INPUT[2];
                     uInputs[0].type = INPUT_KEYBOARD;
                     uInputs[0].ki.wVk = 0;
@@ -468,6 +489,8 @@ function setupGeneralIpcHandlers() {
                 ushort vk = (ushort)(vkCode & 0xFF);
                 bool shift = (vkCode & 0x0100) != 0;
 
+                // Only Shift is safe to combine with VK codes.
+                // Ctrl and Alt are NEVER sent (handled above).
                 int numInputs = 2;
                 if (shift) numInputs += 2;
 

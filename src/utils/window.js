@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('os');
 const storage = require('../storage');
 
-let mouseEventsIgnored = false;
+let mouseEventsIgnored = true;
 let windowResizing = false;
 let resizeAnimation = null;
 const RESIZE_ANIMATION_DURATION = 500; // milliseconds
@@ -12,8 +12,8 @@ const RESIZE_ANIMATION_DURATION = 500; // milliseconds
 function createWindow(sendToRenderer, geminiSessionRef) {
     // Get saved window bounds from storage, or use defaults
     const savedBounds = storage.getWindowBounds();
-    let windowWidth = savedBounds.width || 1100;
-    let windowHeight = savedBounds.height || 800;
+    let windowWidth = savedBounds.width || 509;
+    let windowHeight = savedBounds.height || 352;
 
     const mainWindow = new BrowserWindow({
         width: windowWidth,
@@ -142,6 +142,12 @@ function createWindow(sendToRenderer, geminiSessionRef) {
 
     // After window is created, initialize keybinds
     mainWindow.webContents.once('dom-ready', () => {
+        // Apply default click-through state after window is ready
+        if (mouseEventsIgnored) {
+            mainWindow.setIgnoreMouseEvents(true, { forward: true });
+            mainWindow.webContents.send('click-through-toggled', true);
+        }
+
         setTimeout(() => {
             const defaultKeybinds = getDefaultKeybinds();
             let keybinds = defaultKeybinds;
@@ -1000,14 +1006,15 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 
             console.log('Size update requested for view:', viewName, 'layout:', layoutMode);
 
+            const prefs = storage.getPreferences();
             let targetWidth, targetHeight;
-            const baseWidth = layoutMode === 'compact' ? 700 : 900;
-            const baseHeight = layoutMode === 'compact' ? 500 : 600;
+            const baseWidth = layoutMode === 'compact' ? 700 : (prefs.windowWidth || 509);
+            const baseHeight = layoutMode === 'compact' ? 500 : (prefs.windowHeight || 352);
 
             switch (viewName) {
                 case 'main':
                     targetWidth = baseWidth;
-                    targetHeight = layoutMode === 'compact' ? 320 : 400;
+                    targetHeight = baseHeight;
                     break;
                 case 'customize':
                 case 'settings':

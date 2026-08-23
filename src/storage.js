@@ -431,8 +431,8 @@ function deleteAllSessions() {
 function getWindowBounds() {
     const prefs = getPreferences();
     return {
-        width: prefs.windowWidth || 1100,
-        height: prefs.windowHeight || 800,
+        width: prefs.windowWidth || 509,
+        height: prefs.windowHeight || 352,
         x: prefs.windowX !== undefined ? prefs.windowX : undefined,
         y: prefs.windowY !== undefined ? prefs.windowY : undefined
     };

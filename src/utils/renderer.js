@@ -604,7 +604,12 @@ async function captureManualScreenshot(imageQuality = null) {
 
                 // Determine which prompt to use based on context
                 const isInvigilatorCapture = window._invigilatorAnswerCapture === true;
-                const promptToUse = isInvigilatorCapture ? INVIGILATOR_ANSWER_PROMPT : MANUAL_SCREENSHOT_PROMPT;
+                const basePrompt = isInvigilatorCapture ? INVIGILATOR_ANSWER_PROMPT : MANUAL_SCREENSHOT_PROMPT;
+                
+                // Fetch user custom prompt
+                const prefs = await storage.getPreferences();
+                const customInstructions = prefs.customPrompt ? `\n\nUSER CUSTOM INSTRUCTIONS:\n${prefs.customPrompt}` : '';
+                const promptToUse = basePrompt + customInstructions;
                 
                 if (isInvigilatorCapture) {
                     console.log('[Renderer] Sending screenshot for invigilator answer capture');

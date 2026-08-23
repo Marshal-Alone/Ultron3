@@ -95,8 +95,17 @@ public class Program {
         if (ch == '\t') { SendVk(0x09); return; }
         
         short vkCode = KeyMap.VkKeyScan(ch);
-        if (vkCode == -1) {
-            // Fallback for unicode
+        
+        // SAFETY: Check if VkKeyScan wants Ctrl (0x0200) or Alt (0x0400).
+        // If it does, DO NOT use VK-based input — that would send Ctrl+key
+        // or Alt+key combos which trigger editor/browser shortcuts and can
+        // cause focus loss in proctored online platforms.
+        // Instead, fall through to safe Unicode injection.
+        bool needsCtrl = (vkCode & 0x0200) != 0;
+        bool needsAlt  = (vkCode & 0x0400) != 0;
+        
+        if (vkCode == -1 || needsCtrl || needsAlt) {
+            // Safe Unicode injection — never triggers any shortcut
             INPUT[] uInputs = new INPUT[2];
             uInputs[0].type = INPUT_KEYBOARD;
             uInputs[0].u.ki.wScan = (ushort)ch;
@@ -111,6 +120,8 @@ public class Program {
         ushort vk = (ushort)(vkCode & 0xFF);
         bool shift = (vkCode & 0x0100) != 0;
         
+        // Only Shift is safe to combine with VK codes.
+        // Ctrl and Alt are NEVER sent (handled above).
         int numInputs = 2;
         if (shift) numInputs += 2;
         

@@ -6,6 +6,7 @@ export class AssistantView extends LitElement {
             height: 100%;
             display: flex;
             flex-direction: column;
+            opacity: var(--text-opacity, 1);
         }
 
         * {
@@ -31,7 +32,6 @@ export class AssistantView extends LitElement {
             scroll-behavior: smooth;
             user-select: text;
             cursor: text;
-            opacity: var(--text-opacity, 1);
         }
 
         .response-container * {

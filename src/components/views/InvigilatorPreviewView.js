@@ -41,7 +41,7 @@ export class InvigilatorPreviewView extends LitElement {
       flex-direction: column;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
       z-index: 10000;
-      opacity: 1;
+      opacity: var(--text-opacity, 1);
       transition: opacity 0.3s ease-in-out;
       animation: fadeIn 0.3s ease-in-out;
     }
@@ -56,7 +56,7 @@ export class InvigilatorPreviewView extends LitElement {
         transform: translate(-50%, -48%);
       }
       to {
-        opacity: 1;
+        opacity: var(--text-opacity, 1);
         transform: translate(-50%, -50%);
       }
     }

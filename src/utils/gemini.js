@@ -747,7 +747,12 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             if (provider === 'groq') {
                 // Use Groq for text messages (streaming HTTP)
                 const { groqAI } = require('./groq');
-                const result = await groqAI.sendTextMessage(text.trim());
+                
+                // Construct system prompt including custom instructions
+                const googleSearchEnabled = prefs.googleSearchEnabled !== 'false';
+                const systemPrompt = getSystemPrompt(prefs.profile || 'interview', prefs.customPrompt || '', googleSearchEnabled);
+                
+                const result = await groqAI.sendTextMessage(text.trim(), systemPrompt);
                 return result;
             } else {
                 // Use Gemini realtime session
