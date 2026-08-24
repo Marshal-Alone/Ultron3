@@ -28,18 +28,51 @@ The app registers multiple `ipcRenderer` listeners in `connectedCallback` and fo
 ### Dynamic Theming
 Uses a custom `applyBackgroundAppearance(hex, alpha)` method to generate a full CSS variable color palette (`--bg-primary`, `--bg-secondary`, `--bg-hover`, etc.) by shifting RGB values, applying it globally to `document.documentElement`.
 
-## Sub-Views (`src/components/views/`)
+## Architecture
 
-The application avoids a traditional router (like React Router) in favor of simple conditional rendering in `CheatingDaddyApp`'s `render()` method.
+The UI is built purely with **LitElement** (Web Components) without a bundler, loaded natively in Electron.
+There is **no React** and **no React Router**. Routing is handled by simply swapping `<view>` elements based on the `currentView` property.
 
-### 1. `MainView.js`
-- **Purpose**: The dashboard entry point.
-- **Behavior**: Displays the selected AI profile and provides the primary "Start Session" button. Has error states (`triggerApiKeyError`, `triggerGroqApiKeyError`) if keys are missing.
+### 1. `CheatingDaddyApp.js` (The Root Component)
+This is the root of the application, managing all global state and rendering sub-views.
 
-### 2. `AssistantView.js`
-- **Purpose**: The active session interface (The "Chat").
-- **Behavior**: Displays the real-time transcription and AI streaming response. Uses a custom carousel or pagination mechanism (driven by `currentResponseIndex` and `shouldAnimateResponse` props passed from parent) to display the AI's output.
+**Core State Properties:**
+```javascript
+static properties = {
+    currentView: { type: String }, // 'main', 'assistant', 'settings', 'onboarding'
+    isListening: { type: Boolean },
+    apiKey: { type: String },
+    transcription: { type: String },
+    responses: { type: Array },
+    selectedProfile: { type: String },
+    selectedLanguage: { type: String },
+    isClickThrough: { type: Boolean },
+    backgroundTransparency: { type: Number },
+    // Invigilator State
+    invigilatorModeActive: { type: Boolean },
+    invigilatorTypingMode: { type: String }
+};
+```
 
+### 2. Styling System and Theming
+Styles are encapsulated via the Lit `css` literal. However, dynamic theming (opacity and layout modes) relies on CSS custom properties (variables) injected at the root or body level.
+
+```css
+:host {
+    /* Main Layout */
+    display: block;
+    width: 100%;
+    height: 100vh;
+    background-color: var(--background-transparent);
+    color: var(--text-color);
+}
+
+/* Dynamic properties controlled by JS: */
+/* var(--bg-primary) */
+/* var(--text-color) */
+/* var(--accent-primary) */
+/* var(--text-opacity) */
+```
 ### 3. `CustomizeView.js`
 - **Purpose**: Configuration and settings panel.
 - **Behavior**: Allows the user to select AI profiles (Interview, Sales, Custom), language, screenshot capture interval, image quality, layout mode, and theme transparency.

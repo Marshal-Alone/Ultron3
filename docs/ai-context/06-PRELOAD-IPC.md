@@ -28,31 +28,33 @@ Below is the exhaustive list of IPC channels mapped across the application.
 - `storage:clear-all`
 
 **General App Lifecycle**
-- `get-app-version`: Returns `app.getVersion()`.
+- `get-app-version`: Returns `string` (e.g., "1.0.0").
 - `quit-application`: Gracefully stops macOS audio capture and calls `app.quit()`.
-- `open-external`: Opens a URL in the default OS browser.
-- `update-keybinds`: Re-registers global shortcuts.
-- `ai-provider-changed-notify`: Relays provider change to renderer.
-- `log-message`: Renderer -> Main debug logging.
-- `session-started`: Tracks the active session ID for auto-save on quit.
-- `kill-switch-export`: Forcibly exports the current session data to the Downloads folder.
+- `open-external`: Payload `{ url: string }`. Opens URL in default OS browser.
+- `update-keybinds`: Payload `{ keybinds: Object }`. Re-registers global shortcuts.
+- `ai-provider-changed-notify`: Payload `string` ("gemini" | "groq").
+- `log-message`: Payload `string`. Renderer -> Main debug logging.
+- `session-started`: Payload `string` (sessionId). Tracks the active session for auto-save.
+- `kill-switch-export`: Forcibly exports the current session data to Downloads.
 
 **Keyboard Injection (AutoTyper)**
-- `keyboard:send-key` (Send/Async): Fires a single keypress via PowerShell execution.
-- `keyboard:send-key-sync` (Invoke/Sync): Same as above but waits for execution.
-- `keyboard:type-text` (Invoke): Spawns the native C# `AutoTyper.exe` binary. Supports `instant` and `lineByLine` modes.
-- `keyboard:type-text-clipboard` (Invoke): Extremely fast pasting via `System.Windows.Forms.SendKeys` and clipboard hijacking.
-- `keyboard:pause-typing` / `keyboard:resume-typing` / `keyboard:kill-typing`: Modifies state flags or kills the active C# child process.
+- `keyboard:send-key`: Payload `string` (e.g., "Enter", "A").
+- `keyboard:send-key-sync`: Payload `string`. Returns `Promise<void>`.
+- `keyboard:type-text`: Payload `{ text: string, mode: string, options?: Object }`.
+  - Example: `ipcRenderer.invoke('keyboard:type-text', { text: "const a = 1;", mode: "charByChar", options: { minDelay: 40, maxDelay: 80 } })`.
+- `keyboard:type-text-clipboard`: Payload `{ text: string }`. Fast pasting via OS clipboard.
+- `keyboard:pause-typing` / `keyboard:resume-typing` / `keyboard:kill-typing`: No payload. Modifies C# child process.
 
 ### `src/utils/gemini.js` Handlers
 
 **AI & Audio Session**
-- `initialize-gemini`: Starts the Gemini Live WebSocket connection and configures the audio stream.
-- `send-audio-content` / `send-mic-audio-content` (Send & Invoke): Pushes raw PCM audio buffers to the active Gemini Live WebSocket.
-- `send-image-content` (Invoke): Routes a base64 screenshot either to `groqAI.analyzeScreenshot` or `sendImageToGeminiHttp` depending on the configured provider.
-- `send-text-message` (Invoke): Routes a manual text message to Groq or Gemini.
-- `stop-gemini`: Gracefully closes the active WebSocket.
-- `start-macos-audio` / `stop-macos-audio`: Spawns/kills the `SystemAudioDump` native binary for loopback capture on macOS.
+- `initialize-gemini`: Payload `{ profile: string, language: string, customPrompt: string }`. Starts WebSocket.
+- `send-audio-content` / `send-mic-audio-content`: Payload `{ data: string (Base64) }`.
+  - Example: `ipcRenderer.send('send-mic-audio-content', { data: "UklGRiQAAABXQVZFZm10IBAAAAABAAEA..." })`
+- `send-image-content`: Payload `{ imageBase64: string, prompt: string }`. Routes base64 screenshot to Groq/Gemini.
+- `send-text-message`: Payload `{ text: string }`. Routes manual text message.
+- `stop-gemini`: No payload. Gracefully closes active WebSocket.
+- `start-macos-audio` / `stop-macos-audio`: Spawns native `SystemAudioDump`.
 
 ### Main to Renderer Events (`sendToRenderer`)
 These events are emitted *from* the Main Process *to* the Renderer (listened to by `CheatingDaddyApp.js`):

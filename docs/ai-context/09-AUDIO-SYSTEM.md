@@ -13,7 +13,24 @@ Audio capture is highly platform-dependent in Electron. Ultron3 uses different s
 ### 2. macOS (The `SystemAudioDump` Hack)
 macOS strictly forbids apps from capturing system audio without a kernel extension (like BlackHole) or specialized screen recording permissions that don't easily allow loopback.
 - **Solution**: Ultron3 relies on an external compiled Swift binary located at `src/bin/SystemAudioDump` (for ARM64/Intel).
-- **Behavior**: The Main Process (`startMacOSAudioCapture` in `gemini.js`) spawns this binary as a child process. The binary captures the raw PCM audio from the macOS CoreAudio framework and pipes it to stdout. The Node.js process reads this stdout stream, buffers it, and forwards it to Gemini.
+- **Spawn Logic (`gemini.js`)**:
+  ```javascript
+  const spawnOptions = { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env } };
+  systemAudioProc = spawn(systemAudioPath, [], spawnOptions);
+  
+  const CHUNK_DURATION = 0.1;
+  const SAMPLE_RATE = 24000;
+  const BYTES_PER_SAMPLE = 2;
+  const CHANNELS = 2;
+  const CHUNK_SIZE = SAMPLE_RATE * BYTES_PER_SAMPLE * CHANNELS * CHUNK_DURATION; // 9600 bytes
+  
+  systemAudioProc.stdout.on('data', data => {
+      // Buffer chunks and slice at exactly 9600 bytes
+      const monoChunk = convertStereoToMono(chunk); // Downmix to mono
+      const base64Data = monoChunk.toString('base64');
+      sendAudioToGemini(base64Data, geminiSessionRef);
+  });
+  ```
 - **Renderer Audio**: On macOS, the renderer's `getDisplayMedia` request is explicitly set to `{ audio: false }` to avoid conflict.
 
 ### 3. Linux

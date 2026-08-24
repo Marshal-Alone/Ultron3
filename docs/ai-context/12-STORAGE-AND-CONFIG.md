@@ -17,17 +17,48 @@ All storage is implemented as synchronous `fs.readFileSync` / `fs.writeFileSync`
 
 ### 1. `config.json`
 - **Purpose**: High-level application state.
-- **Key Fields**: `configVersion`, `onboarded` (determines if the setup wizard runs).
+```json
+{
+    "configVersion": 1,
+    "onboarded": false,
+    "layout": "normal"
+}
+```
 
 ### 2. `credentials.json`
-- **Purpose**: Secure(?) storage for API keys.
-- **Key Fields**: `apiKey` (Gemini), `groqApiKey` (Groq), `openRouterApiKey` (OpenRouter).
-- **Note**: Currently stored in plaintext JSON. This is a potential target for future encryption updates.
+- **Purpose**: Secure(?) storage for API keys. (Stored in plaintext).
+```json
+{
+    "apiKey": "",
+    "groqApiKey": "",
+    "openRouterApiKey": ""
+}
+```
 
 ### 3. `preferences.json`
-- **Purpose**: User customization and theming.
-- **Key Fields**: `selectedProfile`, `systemInstruction`, `audioMode`, `backgroundTransparency`, `invigilatorTypingMode`.
-- **Note**: The Renderer aggressively caches these preferences (`preferencesCache`) to avoid IPC bottlenecks during hot loops (like video frame capture).
+- **Purpose**: User customization and theming. The Renderer aggressively caches this via `preferencesCache`.
+```json
+{
+    "customPrompt": "",
+    "systemInstruction": "", 
+    "developerInstruction": "", 
+    "fullSystemPrompt": "", 
+    "selectedProfile": "interview",
+    "selectedLanguage": "en-US",
+    "selectedScreenshotInterval": "5",
+    "selectedImageQuality": "medium",
+    "advancedMode": false,
+    "audioMode": "both",
+    "fontSize": 16,
+    "backgroundTransparency": 0.8,
+    "googleSearchEnabled": false,
+    "aiProvider": "gemini", 
+    "invigilatorTypingMode": "charByChar", 
+    "invigilatorModeEnabled": false, 
+    "holdToTypeEnabled": false,
+    "holdToTypeKey": "0x11,0x10,VK:]"
+}
+```
 
 ### 4. `history/` (Session Logs)
 Each session is stored as a distinct JSON file named by its timestamp (`history/<sessionId>.json`).

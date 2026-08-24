@@ -12,14 +12,41 @@ This document details the responsibilities and architecture of the Electron Main
 **Execution flow:**
 1. **Encoding Fix (Windows Only)**: Executes `chcp 65001` via PowerShell to ensure UTF-8 console output. (Lines 1-15)
 2. **Squirrel Startup**: Checks `electron-squirrel-startup`. Exits if true (used during Windows installation). (Lines 17-19)
-3. **Single Instance Lock**: Requests a single instance lock (`app.requestSingleInstanceLock()`). If another instance exists, it brings the existing window to the front and quits. (Lines 40-52)
+3. **Single Instance Lock**: Requests a single instance lock (`app.requestSingleInstanceLock()`). If another instance exists, it brings the existing window to the front and quits.
 4. **App Ready (`app.whenReady()`)**: 
    - Initializes storage `storage.initializeStorage()`.
    - Creates the main transparent window via `createMainWindow()`.
-   - Sets up IPC handlers for Gemini, Storage, and General operations.
-5. **App Quit**:
-   - `before-quit`: Auto-saves the current active session (transcriptions and screenshots) to the user's Downloads folder via `storage.exportSessionToDownloads(currentSessionId)`. Kills macOS audio capture.
-   - `window-all-closed`: Quits the application if not on macOS (`darwin`).
+   ```javascript
+   const mainWindow = new BrowserWindow({
+       width: windowWidth,
+       height: windowHeight,
+       frame: false,
+       transparent: true,
+       hasShadow: false,
+       alwaysOnTop: true,
+       focusable: true,
+       skipTaskbar: true, // Stealth
+       webPreferences: {
+           nodeIntegration: true,
+           contextIsolation: false, // Critical bypass
+           backgroundThrottling: false,
+           enableBlinkFeatures: 'GetDisplayMedia'
+       },
+       backgroundColor: '#00000000',
+   });
+   ```
+5. **App Quit (`before-quit`)**: Auto-saves the current active session (transcriptions and screenshots) to the user's Downloads folder.
+   ```javascript
+   app.on('before-quit', async event => {
+       if (currentSessionId) {
+           const session = storage.getSession(currentSessionId);
+           if (session && (session.conversationHistory?.length > 0 || session.screenAnalysisHistory?.length > 0)) {
+               storage.exportSessionToDownloads(currentSessionId);
+           }
+       }
+       stopMacOSAudioCapture(); // Kill native Swift process
+   });
+   ```
 
 ## Global State
 
@@ -31,9 +58,9 @@ The Main Process maintains minimal state:
 
 ## Key Imported Services
 
-- `createWindow`, `updateGlobalShortcuts` from `src/utils/window.js`
-- `setupGeminiIpcHandlers`, `stopMacOSAudioCapture`, `sendToRenderer` from `src/utils/gemini.js`
-- `storage` from `src/storage.js`
+- `src/utils/window.js`: Manages `createWindow` and `updateGlobalShortcuts`. Note that while `index.js` manages the lifecycle, `window.js` dynamically registers the vast majority of the application's global shortcuts based on user preferences.
+- `src/utils/gemini.js`: `setupGeminiIpcHandlers`, `stopMacOSAudioCapture`, `sendToRenderer`.
+- `src/storage.js`: Handles all filesystem configuration reading/writing.
 
 ## Security and Architecture Note
 

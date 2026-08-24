@@ -33,17 +33,60 @@ Handles the complex WebSocket lifecycle for `gemini-2.5-flash-native-audio-lates
 
 Optimized for pure speed using OpenAI-compatible endpoints (`https://api.groq.com/openai/v1`).
 
-### Core Features:
-1. **On-the-fly Tag Stripping**: 
-   - `stripThinkingTags(text)` removes `<think>...</think>` blocks in real-time as the stream arrives. This prevents the UI from displaying internal reasoning.
-2. **Fallback Mechanism**:
-   - If the primary model (`qwen/qwen3.6-27b`) fails or hits a rate limit, the `generateAnswer` function immediately wraps it in a try/catch and falls back to `llama-3.1-8b-instant`.
-3. **3-Stage Vision Pipeline (`analyzeScreenshot`)**:
-   Because high-speed models often struggle with complex OCR and logical verification simultaneously, Ultron3 implements a multi-shot reasoning chain for image analysis:
-   - **Stage 1 (Vision Extraction)**: Uses `qwen/qwen3.6-27b` to parse the image into raw text/code.
-   - **Stage 2 (Initial Solve)**: Uses `openai/gpt-oss-120b` to solve the extracted problem while streaming the initial solution to the user.
-   - **Stage 3 (Verification)**: Uses `openai/gpt-oss-120b` to verify the Stage 2 output against the user's prompt. It generates a verified solution and appends it to the UI stream.
+## 1. Gemini Live API Integration (`src/utils/gemini.js`)
+Ultron3 establishes a bidirectional WebSocket connection to the Gemini Multimodal Live API.
 
-## Context Management (`prompts.js` & `promptLogger.js`)
-- `prompts.js` builds the final system prompt by combining the base persona (`interview`, `sales`, etc.) with user-defined custom instructions.
+**Session Initialization Payload:**
+```javascript
+config: {
+    responseModalities: [Modality.AUDIO], // We request AUDIO back
+    outputAudioTranscription: {}, // Request transcript of AI's speech
+    tools: enabledTools, // Google Search grounding
+    inputAudioTranscription: {
+        enableSpeakerDiarization: true,
+        minSpeakerCount: 2,
+        maxSpeakerCount: 2,
+    },
+    contextWindowCompression: { slidingWindow: {} },
+    speechConfig: { languageCode: language },
+    systemInstruction: {
+        parts: [{ text: systemPrompt }],
+    },
+}
+```
+
+## 2. Groq AI Integration (`src/utils/groq.js`)
+Used for ultra-fast text generation, bypassing the heavier Gemini Live API.
+
+**Streaming API Call:**
+```javascript
+const stream = await client.chat.completions.create({
+    model: 'qwen/qwen3.6-27b', // Default Groq model
+    messages: [
+        { role: 'system', content: systemPrompt },
+        ...this.conversationHistory,
+        { role: 'user', content: "[Interviewer]: What is your approach?" }
+    ],
+    stream: true,
+    temperature: 0.3,
+    max_tokens: 150, // Very short responses
+});
+```
+
+## 3. Prompts (`src/utils/prompts.js`)
+The `getSystemPrompt` function constructs the system instructions dynamically based on the selected profile.
+
+**Example `interview` profile requirements:**
+```markdown
+**RESPONSE FORMAT REQUIREMENTS:**
+- Keep responses SHORT and CONCISE (1-3 sentences max)
+- Use **markdown formatting** for better readability
+- Use **bold** for key points and emphasis
+- Use bullet points (-) for lists when appropriate
+- Focus on the most essential information only
+
+**SEARCH TOOL USAGE:**
+- If the interviewer mentions **recent events, news, or current trends**, **ALWAYS use Google search** to get up-to-date information
+```
+
 - `promptLogger.js` is a debugging utility that intercepts all outgoing payloads and writes them to the console, ensuring developers can see exactly what the LLM is receiving (including history truncations).
