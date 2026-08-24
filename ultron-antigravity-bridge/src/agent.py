@@ -204,6 +204,12 @@ class AgentManager:
 
         from google.antigravity import types
 
+        # Ensure previous turn is completely idle before starting a new turn
+        if self._agent and hasattr(self._agent, "conversation"):
+            if not self._agent.conversation.is_idle:
+                logger.info("Awaiting previous turn idle state before starting chat...")
+                await self._agent.conversation.wait_for_idle()
+
         self._state = "THINKING"
         logger.info(f"Processing question (Turn {self.turn_count + 1}): {question[:60]}...")
         
@@ -220,6 +226,14 @@ class AgentManager:
                     yield chunk.text
                 # ToolCalls and other steps are handled internally by Antigravity
 
+        except (asyncio.CancelledError, types.AntigravityCancelledError):
+            logger.info("Agent turn cancelled.")
+            if self._agent and hasattr(self._agent, "conversation"):
+                try:
+                    await self._agent.conversation.wait_for_idle()
+                except Exception:
+                    pass
+            raise
         except Exception as e:
             logger.error(f"Error during agent turn: {e}", exc_info=True)
             raise
@@ -232,12 +246,14 @@ class AgentManager:
         """Cancels active response and restores READY state while preserving conversation history."""
         logger.info("Cancelling active agent turn...")
         try:
-            if self._active_response and hasattr(self._active_response, "cancel"):
+            if self._agent and hasattr(self._agent, "conversation"):
+                res = self._agent.conversation.cancel()
+                if asyncio.iscoroutine(res):
+                    asyncio.create_task(res)
+            elif self._active_response and hasattr(self._active_response, "cancel"):
                 res = self._active_response.cancel()
                 if asyncio.iscoroutine(res):
                     asyncio.create_task(res)
-            elif self._agent and hasattr(self._agent, "conversation"):
-                asyncio.create_task(self._agent.conversation.cancel())
         except Exception as e:
             logger.warning(f"Error during cancellation: {e}")
         finally:
