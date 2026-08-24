@@ -140,6 +140,7 @@ async function sendToGroq(transcription) {
 }
 ```
 
+
 ---
 
 ## 3. Real-Time `<think>` Tag Stripping

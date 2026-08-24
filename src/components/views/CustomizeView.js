@@ -611,6 +611,7 @@ export class CustomizeView extends LitElement {
         openRouterApiKey: { type: String },
         holdToTypeEnabled: { type: Boolean },
         holdToTypeKey: { type: String },
+        customPrompt: { type: String },
         systemInstruction: { type: String },
         developerInstruction: { type: String },
         fullSystemPrompt: { type: String },
@@ -1003,11 +1004,6 @@ export class CustomizeView extends LitElement {
     handleLayoutModeSelect(e) {
         this.layoutMode = e.target.value;
         this.onLayoutModeChange(e.target.value);
-    }
-
-    async handleCustomPromptInput(e) {
-        this.customPrompt = e.target.value;
-        await cheatingDaddy.storage.updatePreference('customPrompt', e.target.value);
     }
 
     async handleAudioModeSelect(e) {
