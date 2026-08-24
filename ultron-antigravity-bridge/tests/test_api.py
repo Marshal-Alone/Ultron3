@@ -3,37 +3,71 @@ import json
 import pytest
 import httpx
 from httpx import AsyncClient
-from src.server import app, agent_client
+from src.server import app, agent_manager
 from src.auth import auth_validator
 
-# Mock agent for testing
-class MockAgentClient:
+# Mock agent manager for testing
+class MockAgentManager:
     def __init__(self):
         self._mock_mode = True
         self.cancel_called = False
+        self.workspace = "/test/workspace"
+        self.model_name = "gemini-3.5-flash-lite"
+        self.state = "READY"
+        self.turn_count = 0
+        self.warmup_duration_sec = 12.5
+        self.error_message = None
         
     def setup(self, workspace):
-        pass
+        self.workspace = workspace
+        
+    async def start(self, auto_warm=True):
+        self.state = "READY"
         
     def cancel(self):
         self.cancel_called = True
+        self.state = "READY"
         
-    async def ask(self, question):
+    async def stop(self):
+        self.state = "STARTING"
+        
+    async def ask(self, question, request_id=None):
         if question == "error":
             raise Exception("Simulated error")
         elif question == "timeout":
             await asyncio.sleep(65)
             yield "never"
         else:
+            self.turn_count += 1
             yield "Hello"
             yield " World"
 
 @pytest.fixture(autouse=True)
 def inject_mock_agent(monkeypatch):
-    mock = MockAgentClient()
-    monkeypatch.setattr("src.server.agent_client", mock)
+    mock = MockAgentManager()
+    monkeypatch.setattr("src.server.agent_manager", mock)
     auth_validator.set_token("test-token")
     return mock
+
+@pytest.mark.asyncio
+async def test_status_auth_missing():
+    async with AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/v1/project/status")
+        assert response.status_code in (401, 403)
+
+@pytest.mark.asyncio
+async def test_status_authenticated():
+    async with AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get(
+            "/v1/project/status",
+            headers={"Authorization": "Bearer test-token"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["state"] == "READY"
+        assert data["workspace"] == "/test/workspace"
+        assert data["turnCount"] == 0
+        assert data["warmupDurationSec"] == 12.5
 
 @pytest.mark.asyncio
 async def test_auth_missing():
@@ -44,7 +78,7 @@ async def test_auth_missing():
             "mode": "interview",
             "stream": True
         })
-        assert response.status_code in (401, 403) # HTTPBearer returns 403 or 401 when missing
+        assert response.status_code in (401, 403)
 
 @pytest.mark.asyncio
 async def test_auth_invalid():
@@ -127,18 +161,11 @@ async def test_agent_error():
             
             assert len(events) == 2
             assert events[0] == {"type": "start", "requestId": "req_2"}
-            assert events[1] == {"type": "error", "requestId": "req_2", "code": "AGENT_ERROR", "message": "An error occurred during project analysis."}
+            assert events[1] == {"type": "error", "requestId": "req_2", "code": "AGENT_ERROR", "message": "Simulated error"}
 
 @pytest.mark.asyncio
 async def test_concurrency():
-    # Simulate a slow request by mocking the lock acquisition
-    # Wait, the lock is real. Let's send two requests concurrently.
-    # To reliably test concurrency, we need the first request to block.
-    # We can use our "timeout" mock for the first request.
     async with AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
-        # Start first request without waiting for it to finish
-        import asyncio
-        
         async def slow_req():
             try:
                 async with client.stream(

@@ -1,0 +1,45 @@
+{
+  "agent_init_sec": 2.33,
+  "warmup_sec": 10.5,
+  "benchmark_questions": [
+    {
+      "id": "Q1",
+      "turn": 2,
+      "question": "What technologies did you use to build Ultron3?",
+      "ttft_sec": 1.43,
+      "total_sec": 2.39,
+      "char_len": 1269,
+      "preview": "I built Ultron3 using a robust set of modern desktop and AI technologies:  - **Electron & Electron Forge** ([package.jso..."
+    },
+    {
+      "id": "Q2",
+      "turn": 3,
+      "question": "How does Ultron3 capture the screen?",
+      "ttft_sec": 5.7,
+      "total_sec": 6.25,
+      "char_len": 811,
+      "preview": "Ultron3 captures the screen using Electron's built-in `desktopCapturer` API combined with `navigator.mediaDevices.getUse..."
+    },
+    {
+      "id": "Q3",
+      "turn": 4,
+      "question": "Why did you choose Electron for this project?",
+      "ttft_sec": 1.21,
+      "total_sec": 1.74,
+      "char_len": 961,
+      "preview": "I chose Electron for Ultron3 for several key reasons:  1. **Cross-Platform Desktop Integration**: Electron allows us to ..."
+    },
+    {
+      "id": "Q1-Repeat",
+      "turn": 5,
+      "question": "What technologies did you use to build Ultron3?",
+      "ttft_sec": 1.44,
+      "total_sec": 1.96,
+      "char_len": 1269,
+      "preview": "I built Ultron3 using a robust set of modern desktop and AI technologies:  - **Electron & Electron Forge** ([package.jso..."
+    }
+  ],
+  "cancellation_sec": 0.67,
+  "recovery_ttft_sec": 8.5,
+  "recovery_total_sec": 8.71
+}

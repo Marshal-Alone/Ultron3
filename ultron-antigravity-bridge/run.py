@@ -31,7 +31,7 @@ if not os.environ.get("GEMINI_API_KEY"):
             except Exception:
                 pass
 
-from src.server import app, agent_client
+from src.server import app, agent_manager
 from src.handshake import HandshakeManager
 from src.auth import auth_validator
 
@@ -50,12 +50,12 @@ def main():
         logger.error(f"Failed to initialize handshake: {e}")
         sys.exit(1)
         
-    # Configure auth and agent
+    # Configure auth and agent workspace
     auth_validator.set_token(handshake.token)
-    agent_client.setup(handshake.workspace)
+    agent_manager.setup(handshake.workspace)
     
     try:
-        # Run server
+        # Run server (lifespan will start the persistent Agent and warmup in background)
         uvicorn.run(app, host="127.0.0.1", port=handshake.port)
     finally:
         handshake.cleanup()
