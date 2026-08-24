@@ -196,6 +196,7 @@ function getDefaultKeybinds() {
         increaseHeight: isMac ? 'Cmd+Alt+Up' : 'Ctrl+Alt+Up',
         decreaseHeight: isMac ? 'Cmd+Alt+Down' : 'Ctrl+Alt+Down',
         toggleListenAnswer: isMac ? 'Cmd+Space' : 'Ctrl+Space',
+        projectCopilot: isMac ? 'Cmd+P' : 'Ctrl+P',
         // Invigilator Mode hotkeys
         toggleInvigilatorMode: isMac ? 'Cmd+Alt+M' : 'Ctrl+Alt+M',
         triggerAnswerCapture: isMac ? 'Cmd+Alt+A' : 'Ctrl+Alt+A',
@@ -760,6 +761,18 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             });
         } catch (error) {
             console.error(`[HOTKEYS] Failed to register toggleListenAnswer (${keybinds.toggleListenAnswer}):`, error);
+        }
+    }
+
+    // Register Project Copilot shortcut
+    if (keybinds.projectCopilot) {
+        try {
+            globalShortcut.register(keybinds.projectCopilot, () => {
+                const { ipcMain } = require('electron');
+                ipcMain.emit('trigger-project-copilot');
+            });
+        } catch (error) {
+            console.error(`[HOTKEYS] Failed to register projectCopilot (${keybinds.projectCopilot}):`, error);
         }
     }
 

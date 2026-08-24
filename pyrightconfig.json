@@ -1,0 +1,9 @@
+{
+  "venvPath": "./ultron-antigravity-bridge",
+  "venv": "venv",
+  "extraPaths": [
+    "./ultron-antigravity-bridge",
+    "./ultron-antigravity-bridge/venv/Lib/site-packages"
+  ]
+}
+

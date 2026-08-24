@@ -59,11 +59,37 @@ class AgentClient:
                     yield chunk
             return
 
-        from google.antigravity import Agent, LocalAgentConfig
+        import json
+        if not os.environ.get("GEMINI_API_KEY"):
+            cred_paths = [
+                os.path.expanduser("~/AppData/Roaming/jarvis-config/credentials.json"),
+                os.path.expanduser("~/Library/Application Support/jarvis-config/credentials.json"),
+                os.path.expanduser("~/.config/jarvis-config/credentials.json"),
+            ]
+            for cp in cred_paths:
+                if os.path.exists(cp):
+                    try:
+                        with open(cp, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                            if data.get("apiKey"):
+                                os.environ["GEMINI_API_KEY"] = data["apiKey"]
+                                break
+                    except Exception:
+                        pass
+
+        from google.antigravity import Agent, LocalAgentConfig, types
+
+        model_name = os.environ.get("ANTIGRAVITY_MODEL", "gemini-3.5-flash-lite")
         
         config = LocalAgentConfig(
+            model=model_name,
             system_instructions=SYSTEM_INSTRUCTIONS,
-            workspaces=[self.workspace]
+            workspaces=[self.workspace],
+            capabilities=types.CapabilitiesConfig(
+                agent_behavior=types.AgentBehavior.AUTONOMOUS,
+                enabled_tools=types.BuiltinTools.read_only(),
+                enable_subagents=False,
+            )
         )
 
         try:
@@ -71,9 +97,7 @@ class AgentClient:
                 response = await agent.chat(question)
                 self._active_response = response
                 
-                # Assume async iteration returns text chunks
                 async for chunk in response:
-                    # In case of cancellation during iteration, break
                     yield chunk
 
         except Exception as e:
@@ -81,3 +105,4 @@ class AgentClient:
             raise
         finally:
             self._active_response = None
+

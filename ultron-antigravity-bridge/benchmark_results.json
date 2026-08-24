@@ -1,0 +1,35 @@
+[
+  {
+    "id": "Q1",
+    "question": "What technologies did you use to build Ultron3?",
+    "ttft_sec": 9.83,
+    "total_time_sec": 14.27,
+    "token_chunks": 9,
+    "char_length": 808,
+    "inspected_files": false,
+    "hallucinations_detected": false,
+    "full_text": "Ultron3 is built as an Electron desktop application using **Electron Forge** for packaging and running. \n\nFor the frontend and user interface, it uses **LitElement / Lit** components rather than React or Vue, along with standard web technologies. \n\nOn the AI and backend communication side, it integrates with **Google Gemini 2.0 Flash / Live** (using `@google/genai`) and **OpenAI APIs**, handling dual-routing via WebSockets and Server-Sent Events (SSE). \n\nFor platform-specific features:\n- **Audio capture** uses native loops and platform helpers (like system audio capture and microphone inputs).\n- **Stealth and automation features** include native binaries such as a compiled C# binary on Windows using `User32.dll`'s `SendInput` for secure keystroke injection, and native audio/screen capture tooling."
+  },
+  {
+    "id": "Q2",
+    "question": "How does Ultron3 capture the screen?",
+    "ttft_sec": 8.9,
+    "total_time_sec": 32.39,
+    "token_chunks": 14,
+    "char_length": 1257,
+    "inspected_files": true,
+    "hallucinations_detected": false,
+    "full_text": "Ultron3 captures the screen natively within the Chromium engine using WebRTC (`navigator.mediaDevices.getDisplayMedia`), which avoids native OS screenshot APIs that might trigger anti-cheat software. \n\nSpecifically, the capture process works as follows:\n1. **Stream Acquisition**: [`startCapture`](file:///C:/Users/marsh/Downloads/Ultron3/src/utils/renderer.js) requests a display media stream using [`navigator.mediaDevices.getDisplayMedia`](file:///C:/Users/marsh/Downloads/Ultron3/docs/ai-context/10-SCREEN-VISION.md#L12-L20) configured for a monitor display surface at 1 frame per second.\n2. **Video Element Rendering**: The media stream is piped into a hidden HTML5 `<video>` element (`video.srcObject = mediaStream`).\n3. **Canvas Extraction**: When a screenshot is taken (`captureManualScreenshot`), the video frame is drawn onto an offscreen HTML5 `<canvas>` via `ctx.drawImage(video, 0, 0, canvas.width, canvas.height)`.\n4. **IPC Transmission**: The canvas content is extracted as a base64-encoded JPEG (`canvas.toDataURL('image/jpeg', 0.9)`) and sent to the main process via [`ipcRenderer.send('send-image-content', ...)`](file:///C:/Users/marsh/Downloads/Ultron3/docs/ai-context/10-SCREEN-VISION.md#L38) for processing through the vision pipeline."
+  },
+  {
+    "id": "Q3",
+    "question": "Why did you choose Electron for this project?",
+    "ttft_sec": 9.95,
+    "total_time_sec": 12.13,
+    "token_chunks": 13,
+    "char_length": 1339,
+    "inspected_files": false,
+    "hallucinations_detected": false,
+    "full_text": "I chose Electron for Ultron3 primarily because it provides the deep native OS integration and advanced window management capabilities required for a real-time, cross-platform overlay application. \n\nSpecifically, Electron enabled us to implement:\n1. **Advanced Overlay and Stealth Features**: We needed `transparent: true`, `frame: false`, and `win.setAlwaysOnTop(true, 'screen-saver')` so the UI floats seamlessly above full-screen apps and games without standard window borders. Features like `win.setIgnoreMouseEvents(true, { forward: true })` also allow users to click right through the UI to underlying applications.\n2. **Global OS Hotkeys**: Electron's `globalShortcut` module lets us capture key combinations (like `Ctrl+Enter` for capturing screenshots and triggering AI analysis or `Ctrl+Shift+Space` for toggling visibility) globally at the OS level, even when the application is unfocused or completely hidden.\n3. **Native Process & IPC Bridging**: Ultron3 integrates closely with native OS utilities\u2014such as spawning compiled C# binaries (`AutoTyper.exe`) via `user32.dll` injection for high-speed stealth auto-typing in Invigilator Mode, and handling local audio capture pipelines. Electron's architecture gives us robust IPC bridges and direct Node.js access in the main process to coordinate these native components smoothly."
+  }
+]

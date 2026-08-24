@@ -1,0 +1,11 @@
+[tool.pyright]
+extraPaths = [
+    "ultron-antigravity-bridge",
+    "ultron-antigravity-bridge/src"
+]
+
+[tool.pyrefly]
+search-paths = [
+    "ultron-antigravity-bridge",
+    "ultron-antigravity-bridge/src"
+]

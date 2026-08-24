@@ -1,0 +1,109 @@
+{
+  "startup_time_sec": 2.26,
+  "pattern_a_ephemeral": [
+    {
+      "id": "Q1",
+      "question": "What technologies did you use to build Ultron3?",
+      "setup_sec": 2.27,
+      "ttft_sec": 11.3,
+      "total_sec": 12.2,
+      "tool_calls": [
+        "find_file",
+        "view_file",
+        "view_file",
+        "view_file",
+        "view_file"
+      ],
+      "char_len": 1151,
+      "preview": "Ultron3 is built using a modern desktop and AI technology stack:  - **Core Framework**: [Electron](file:///C:/Users/mars..."
+    },
+    {
+      "id": "Q2",
+      "question": "How does Ultron3 capture the screen?",
+      "setup_sec": 2.25,
+      "ttft_sec": 14.19,
+      "total_sec": 15.18,
+      "tool_calls": [
+        "find_file",
+        "search_directory",
+        "find_file",
+        "find_file",
+        "find_file",
+        "find_file",
+        "view_file"
+      ],
+      "char_len": 1262,
+      "preview": "Ultron3 captures the screen natively within the Chromium engine using WebRTC rather than traditional OS-level screenshot..."
+    },
+    {
+      "id": "Q3",
+      "question": "Why did you choose Electron for this project?",
+      "setup_sec": 2.73,
+      "ttft_sec": 19.01,
+      "total_sec": 20.27,
+      "tool_calls": [
+        "find_file",
+        "find_file",
+        "find_file",
+        "view_file",
+        "view_file"
+      ],
+      "char_len": 1720,
+      "preview": "I chose Electron for Ultron3 because building a real-time, interactive system overlay requires deep access to native ope..."
+    }
+  ],
+  "pattern_b_persistent_init_sec": 2.27,
+  "pattern_b_persistent": [
+    {
+      "id": "Q1",
+      "turn": 1,
+      "question": "What technologies did you use to build Ultron3?",
+      "ttft_sec": 11.66,
+      "total_sec": 12.73,
+      "tool_calls": [
+        "list_directory",
+        "view_file",
+        "view_file",
+        "find_file",
+        "find_file",
+        "view_file",
+        "view_file"
+      ],
+      "char_len": 1614,
+      "preview": "To build Ultron3, I used a modern desktop and AI tech stack centered around **Electron** and **Node.js** for the desktop..."
+    },
+    {
+      "id": "Q2",
+      "turn": 2,
+      "question": "How does Ultron3 capture the screen?",
+      "ttft_sec": 4.44,
+      "total_sec": 5.0,
+      "tool_calls": [
+        "search_directory",
+        "view_file"
+      ],
+      "char_len": 1012,
+      "preview": "Ultron3 captures the screen using Electron's native [`desktopCapturer`](file:///C:/Users/marsh/Downloads/Ultron3/src/uti..."
+    },
+    {
+      "id": "Q3",
+      "turn": 3,
+      "question": "Why did you choose Electron for this project?",
+      "ttft_sec": 1.35,
+      "total_sec": 2.1,
+      "tool_calls": [],
+      "char_len": 1248,
+      "preview": "I chose Electron for Ultron3 for several key reasons:  1. **Native Screen and Audio Capture**: Electron provides low-lev..."
+    },
+    {
+      "id": "Q1-Repeat",
+      "turn": 4,
+      "question": "What technologies did you use to build Ultron3?",
+      "ttft_sec": 1.47,
+      "total_sec": 2.38,
+      "tool_calls": [],
+      "char_len": 1281,
+      "preview": "I used a modern desktop and AI stack to build Ultron3:  - **Desktop Framework**: [`Electron`](file:///C:/Users/marsh/Dow..."
+    }
+  ]
+}

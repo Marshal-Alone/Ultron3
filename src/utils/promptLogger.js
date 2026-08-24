@@ -1,9 +1,14 @@
+const { EventEmitter } = require('events');
+
 /**
  * Prompt Logger Utility
  * Logs final prompts being sent to AI for debugging
  */
 
 class PromptLogger {
+    static events = new EventEmitter();
+    static lastQuestion = '';
+
     /**
      * Standardized unified payload logging for any question/prompt sent to AI
      * @param {Object} options
@@ -12,6 +17,9 @@ class PromptLogger {
      * @param {string} options.question
      */
     static logPayloadSentToAI({ systemPrompt, conversationHistory = [], question }) {
+        PromptLogger.lastQuestion = question;
+        PromptLogger.events.emit('new-ai-request', question);
+        
         console.log('\n======================== [PAYLOAD SENT TO AI] ========================');
         console.log('[SYSTEM PROMPT]:');
         console.log(systemPrompt || '(Default system persona)');

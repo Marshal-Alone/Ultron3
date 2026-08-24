@@ -21,6 +21,7 @@ if (require('electron-squirrel-startup')) {
 const { app, BrowserWindow, shell, ipcMain, clipboard, screen, globalShortcut } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
+const { setupAntigravityIpcHandlers } = require('./utils/antigravity');
 const storage = require('./storage');
 const { execFile } = require('child_process');
 const fs = require('fs');
@@ -57,6 +58,7 @@ if (!gotTheLock) {
 
         createMainWindow();
         setupGeminiIpcHandlers(geminiSessionRef);
+        setupAntigravityIpcHandlers();
         setupStorageIpcHandlers();
         setupGeneralIpcHandlers();
     });
