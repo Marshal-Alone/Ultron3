@@ -8,6 +8,14 @@ const { EventEmitter } = require('events');
 class PromptLogger {
     static events = new EventEmitter();
     static lastQuestion = '';
+    static liveTranscript = '';
+
+    static setLiveTranscript(transcript) {
+        if (transcript && transcript.trim()) {
+            PromptLogger.liveTranscript = transcript.trim();
+            PromptLogger.lastQuestion = transcript.trim();
+        }
+    }
 
     /**
      * Standardized unified payload logging for any question/prompt sent to AI
@@ -17,7 +25,10 @@ class PromptLogger {
      * @param {string} options.question
      */
     static logPayloadSentToAI({ systemPrompt, conversationHistory = [], question }) {
-        PromptLogger.lastQuestion = question;
+        if (question && question.trim()) {
+            PromptLogger.lastQuestion = question.trim();
+            PromptLogger.liveTranscript = question.trim();
+        }
         PromptLogger.events.emit('new-ai-request', question);
         
         console.log('\n======================== [PAYLOAD SENT TO AI] ========================');

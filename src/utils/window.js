@@ -197,6 +197,7 @@ function getDefaultKeybinds() {
         decreaseHeight: isMac ? 'Cmd+Alt+Down' : 'Ctrl+Alt+Down',
         toggleListenAnswer: isMac ? 'Cmd+Space' : 'Ctrl+Space',
         projectCopilot: isMac ? 'Cmd+P' : 'Ctrl+P',
+        toggleBridge: isMac ? 'Cmd+Alt+B' : 'Ctrl+Alt+B',
         // Invigilator Mode hotkeys
         toggleInvigilatorMode: isMac ? 'Cmd+Alt+M' : 'Ctrl+Alt+M',
         triggerAnswerCapture: isMac ? 'Cmd+Alt+A' : 'Ctrl+Alt+A',
@@ -773,6 +774,18 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
             });
         } catch (error) {
             console.error(`[HOTKEYS] Failed to register projectCopilot (${keybinds.projectCopilot}):`, error);
+        }
+    }
+
+    // Register Toggle Stealth Bridge shortcut (Ctrl+Alt+B / Cmd+Alt+B)
+    if (keybinds.toggleBridge) {
+        try {
+            globalShortcut.register(keybinds.toggleBridge, () => {
+                const { toggleBridgeProcess } = require('./antigravity');
+                toggleBridgeProcess();
+            });
+        } catch (error) {
+            console.error(`[HOTKEYS] Failed to register toggleBridge (${keybinds.toggleBridge}):`, error);
         }
     }
 

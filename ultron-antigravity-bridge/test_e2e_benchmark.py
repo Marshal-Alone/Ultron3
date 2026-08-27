@@ -29,7 +29,7 @@ if not os.environ.get("GEMINI_API_KEY"):
             except Exception:
                 pass
 
-from src.agent import AgentClient
+from src.agent import AgentManager as AgentClient
 
 QUESTIONS = [
     ("Q1", "What technologies did you use to build Ultron3?"),

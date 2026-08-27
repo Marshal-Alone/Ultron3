@@ -1,0 +1,422 @@
+{
+  "phase": 7,
+  "total_questions": 20,
+  "overall_accuracy_pct": 95.0,
+  "hallucination_count": 0,
+  "first_person_pass_count": 17,
+  "conciseness_pass_count": 20,
+  "spoken_pass_count": 20,
+  "avg_char_len": 203.3,
+  "avg_ttft_sec": 1.87,
+  "median_ttft_sec": 1.16,
+  "avg_total_sec": 1.92,
+  "comparison_vs_p6": {
+    "p6_avg_chars": 870,
+    "p7_avg_chars": 203.3,
+    "char_reduction_pct": 76.6,
+    "p6_median_ttft": 2.31,
+    "p7_median_ttft": 1.16
+  },
+  "questions": [
+    {
+      "id": "Q1",
+      "category": "PROJECT FACTS",
+      "question": "What technologies did you use to build Ultron3?",
+      "turn": 2,
+      "ttft_sec": 1.15,
+      "total_sec": 1.17,
+      "char_len": 276,
+      "chunks_count": 4,
+      "answer": "I built Ultron3 using Electron for the desktop shell, vanilla JavaScript with Lit for the UI components, and the Google GenAI SDK for real-time multimodal assistance. It also integrates native OS audio capture, screen recording, and compiled binaries for low-level automation.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PASS",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 276,
+        "topic_hits": 2
+      }
+    },
+    {
+      "id": "Q2",
+      "category": "PROJECT FACTS",
+      "question": "How does Ultron3 capture the screen?",
+      "turn": 3,
+      "ttft_sec": 1.1,
+      "total_sec": 1.11,
+      "char_len": 230,
+      "chunks_count": 3,
+      "answer": "I built the screen capture pipeline using Electron's `desktopCapturer` API to grab active display streams. The frames are then processed through a multi-stage vision pipeline to extract contextual information for the AI assistant.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PASS",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 230,
+        "topic_hits": 2
+      }
+    },
+    {
+      "id": "Q3",
+      "category": "PROJECT FACTS",
+      "question": "How does the audio capture pipeline work?",
+      "turn": 4,
+      "ttft_sec": 1.08,
+      "total_sec": 1.31,
+      "char_len": 294,
+      "chunks_count": 4,
+      "answer": "I built the audio capture pipeline to handle system audio and microphone input cross-platform, using loopback capture on Windows and a custom Swift binary on macOS. The raw PCM audio chunks are streamed through utility handlers for voice activity detection and sent directly to the AI provider.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PASS",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 294,
+        "topic_hits": 3
+      }
+    },
+    {
+      "id": "Q4",
+      "category": "PROJECT FACTS",
+      "question": "How does the application communicate between Electron's main process and renderer?",
+      "turn": 5,
+      "ttft_sec": 1.0,
+      "total_sec": 1.02,
+      "char_len": 225,
+      "chunks_count": 3,
+      "answer": "I configured the application with `nodeIntegration: true` and `contextIsolation: false`, allowing the renderer process to communicate directly with the main process and Node.js APIs without requiring a complex context bridge.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PASS",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 225,
+        "topic_hits": 0
+      }
+    },
+    {
+      "id": "Q5",
+      "category": "ARCHITECTURE",
+      "question": "Explain the complete flow from an interviewer asking a question to the answer appearing in Ultron3.",
+      "turn": 6,
+      "ttft_sec": 1.29,
+      "total_sec": 1.31,
+      "char_len": 322,
+      "chunks_count": 4,
+      "answer": "When the interviewer speaks, the audio capture pipeline streams the PCM audio data to the main process. The AI subsystem then processes the incoming audio alongside live screen frames through the Gemini model. Finally, the generated response is streamed back via IPC and rendered instantly onto the transparent overlay UI.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PASS",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 322,
+        "topic_hits": 5
+      }
+    },
+    {
+      "id": "Q6",
+      "category": "ARCHITECTURE",
+      "question": "How are Gemini and Groq used differently in Ultron3?",
+      "turn": 7,
+      "ttft_sec": 1.81,
+      "total_sec": 1.86,
+      "char_len": 250,
+      "chunks_count": 4,
+      "answer": "I used Google Gemini for real-time multimodal streaming over WebSockets and Groq for fast text-based inference. This dual setup lets me route live audio and vision directly to Gemini while utilizing Groq when high-speed text completions are required.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PASS",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 250,
+        "topic_hits": 4
+      }
+    },
+    {
+      "id": "Q7",
+      "category": "ARCHITECTURE",
+      "question": "How does the Project Copilot bridge communicate with Ultron3?",
+      "turn": 8,
+      "ttft_sec": 3.88,
+      "total_sec": 3.89,
+      "char_len": 172,
+      "chunks_count": 3,
+      "answer": "I didn't use a separate Project Copilot bridge in this project\u2014it's an integrated Electron application that manages its own IPC, audio capture, and AI streaming internally.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PASS",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 172,
+        "topic_hits": 0
+      }
+    },
+    {
+      "id": "Q8",
+      "category": "DESIGN DECISIONS",
+      "question": "Why did you choose Electron for this project?",
+      "turn": 9,
+      "ttft_sec": 0.98,
+      "total_sec": 1.0,
+      "char_len": 187,
+      "chunks_count": 3,
+      "answer": "A practical reason for choosing Electron in this codebase is that it gives me native desktop APIs for screen capture and transparent overlays without sacrificing web-based UI flexibility.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PASS",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 187,
+        "topic_hits": 4
+      }
+    },
+    {
+      "id": "Q9",
+      "category": "DESIGN DECISIONS",
+      "question": "Why did you use Lit instead of React?",
+      "turn": 10,
+      "ttft_sec": 1.0,
+      "total_sec": 1.01,
+      "char_len": 203,
+      "chunks_count": 2,
+      "answer": "A practical reason for choosing Lit in this codebase is that it provides lightweight, standards-compliant web components without heavy framework overhead or build step complexity in the renderer process.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PARTIAL",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 203,
+        "topic_hits": 4
+      }
+    },
+    {
+      "id": "Q10",
+      "category": "DESIGN DECISIONS",
+      "question": "Why did you separate the Antigravity bridge into a Python microservice?",
+      "turn": 11,
+      "ttft_sec": 0.99,
+      "total_sec": 1.01,
+      "char_len": 191,
+      "chunks_count": 3,
+      "answer": "I didn't use a Python microservice for the bridge in this project\u2014the application is a standalone Electron desktop app that handles everything natively within its main and renderer processes.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PASS",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 191,
+        "topic_hits": 2
+      }
+    },
+    {
+      "id": "Q11",
+      "category": "IMPLEMENTATION DETAILS",
+      "question": "How does Invigilator Mode perform automatic typing?",
+      "turn": 12,
+      "ttft_sec": 4.81,
+      "total_sec": 4.83,
+      "char_len": 206,
+      "chunks_count": 3,
+      "answer": "Invigilator Mode injects generated answers into the active window by simulating keystrokes character-by-character or instantly. It manages typing state and answer previews to automate text input seamlessly.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PARTIAL",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 206,
+        "topic_hits": 2
+      }
+    },
+    {
+      "id": "Q12",
+      "category": "IMPLEMENTATION DETAILS",
+      "question": "How does Ultron3 handle application shutdown and session export?",
+      "turn": 13,
+      "ttft_sec": 4.97,
+      "total_sec": 4.99,
+      "char_len": 190,
+      "chunks_count": 3,
+      "answer": "I use `storage.js` to serialize conversation history and preferences to JSON files in the user's AppData directory upon session closure, ensuring seamless state persistence across shutdowns.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PASS",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 190,
+        "topic_hits": 3
+      }
+    },
+    {
+      "id": "Q13",
+      "category": "IMPLEMENTATION DETAILS",
+      "question": "How does the application handle AI streaming?",
+      "turn": 14,
+      "ttft_sec": 1.09,
+      "total_sec": 1.12,
+      "char_len": 244,
+      "chunks_count": 3,
+      "answer": "The application handles AI streaming by maintaining active WebSocket connections with Google Gemini for real-time multimodal responses and Server-Sent Events (SSE) for Groq text completions, piping data chunks directly to the UI as they arrive.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PASS",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 244,
+        "topic_hits": 4
+      }
+    },
+    {
+      "id": "Q14",
+      "category": "FOLLOW-UP / MULTI-TURN",
+      "question": "How does screen capture work?",
+      "turn": 15,
+      "ttft_sec": 1.03,
+      "total_sec": 1.07,
+      "char_len": 176,
+      "chunks_count": 3,
+      "answer": "I use Electron's `desktopCapturer` API to capture display streams, which are then processed through a multi-stage vision pipeline to extract relevant visual context for the AI.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PASS",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 176,
+        "topic_hits": 2
+      }
+    },
+    {
+      "id": "Q15",
+      "category": "FOLLOW-UP / MULTI-TURN",
+      "question": "Why did you implement it that way?",
+      "turn": 16,
+      "ttft_sec": 1.04,
+      "total_sec": 1.08,
+      "char_len": 186,
+      "chunks_count": 3,
+      "answer": "A practical reason for choosing Electron's `desktopCapturer` in this codebase is that it gives me native access to display streams without external dependencies or complex native addons.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PARTIAL",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 186,
+        "topic_hits": 2
+      }
+    },
+    {
+      "id": "Q16",
+      "category": "FOLLOW-UP / MULTI-TURN",
+      "question": "What happens to the captured image after that?",
+      "turn": 17,
+      "ttft_sec": 5.14,
+      "total_sec": 5.17,
+      "char_len": 129,
+      "chunks_count": 3,
+      "answer": "The captured stream frames are fed into the AI session via WebSockets to provide real-time visual context alongside audio inputs.",
+      "evaluation": {
+        "technical_accuracy": "FAIL",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PASS",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 129,
+        "topic_hits": 0
+      }
+    },
+    {
+      "id": "Q17",
+      "category": "FOLLOW-UP / MULTI-TURN",
+      "question": "What would happen if that process failed?",
+      "turn": 18,
+      "ttft_sec": 1.24,
+      "total_sec": 1.27,
+      "char_len": 156,
+      "chunks_count": 3,
+      "answer": "If the screen capture fails, the app falls back gracefully, continuing to provide AI assistance solely based on the incoming audio and conversation history.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PASS",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 156,
+        "topic_hits": 0
+      }
+    },
+    {
+      "id": "Q18",
+      "category": "UNKNOWN / ANTI-HALLUCINATION",
+      "question": "Why did you choose Kubernetes for Ultron3?",
+      "turn": 19,
+      "ttft_sec": 1.47,
+      "total_sec": 1.65,
+      "char_len": 142,
+      "chunks_count": 3,
+      "answer": "I didn't use Kubernetes in this project\u2014it's a local desktop application that handles capture and UI rendering natively on the client machine.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PASS",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 142,
+        "topic_hits": 2
+      }
+    },
+    {
+      "id": "Q19",
+      "category": "UNKNOWN / ANTI-HALLUCINATION",
+      "question": "How does your PostgreSQL replication architecture work?",
+      "turn": 20,
+      "ttft_sec": 1.16,
+      "total_sec": 1.23,
+      "char_len": 165,
+      "chunks_count": 3,
+      "answer": "I didn't use PostgreSQL in this project\u2014it's a local desktop application that stores configuration and history locally as JSON files in the user's AppData directory.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PASS",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 165,
+        "topic_hits": 1
+      }
+    },
+    {
+      "id": "Q20",
+      "category": "UNKNOWN / ANTI-HALLUCINATION",
+      "question": "Why did you choose Redis for caching?",
+      "turn": 21,
+      "ttft_sec": 1.21,
+      "total_sec": 1.24,
+      "char_len": 123,
+      "chunks_count": 3,
+      "answer": "I didn't use Redis in this project\u2014state and preferences are managed directly in memory and persisted via local JSON files.",
+      "evaluation": {
+        "technical_accuracy": "PASS",
+        "hallucination": "PASS (Grounded)",
+        "first_person_style": "PASS",
+        "conciseness": "PASS",
+        "spoken_fluency": "PASS",
+        "char_len": 123,
+        "topic_hits": 0
+      }
+    }
+  ]
+}

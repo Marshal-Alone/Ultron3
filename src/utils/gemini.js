@@ -320,12 +320,14 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                         newTranscript = formatSpeakerResults(message.serverContent.inputTranscription.results);
                         currentTranscription += newTranscript;
                         pendingSpeechTranscript += newTranscript;
+                        PromptLogger.setLiveTranscript(currentTranscription || pendingSpeechTranscript);
                     } else if (message.serverContent?.inputTranscription?.text) {
                         const text = message.serverContent.inputTranscription.text;
                         if (text.trim() !== '') {
                             newTranscript = text;
                             currentTranscription += text;
                             pendingSpeechTranscript += text;
+                            PromptLogger.setLiveTranscript(currentTranscription || pendingSpeechTranscript);
                         }
                     }
 

@@ -72,20 +72,26 @@ describe('Antigravity Client', () => {
         expect(readFileSpy).not.toHaveBeenCalled();
     });
 
-    test('missing session', async () => {
+    test('missing session auto-starts bridge', async () => {
         readFileSpy.mockRejectedValue(new Error('File not found'));
         await antigravity.triggerProjectQuestion();
         
-        expect(mockSend).toHaveBeenCalledWith('update-status', 'Disconnected');
-        expect(mockSend).toHaveBeenCalledWith('new-response', 'Error: Project Copilot bridge is not running.');
+        expect(mockSend).toHaveBeenCalledWith('update-status', 'Starting Bridge...');
+        expect(mockSend).toHaveBeenCalledWith(
+            'new-response',
+            expect.stringContaining('Project Copilot bridge is starting in stealth background mode')
+        );
     });
 
-    test('stale session', async () => {
+    test('stale session notifies warming', async () => {
         readFileSpy.mockResolvedValue(JSON.stringify({ status: 'stopped' }));
         await antigravity.triggerProjectQuestion();
         
-        expect(mockSend).toHaveBeenCalledWith('update-status', 'Disconnected');
-        expect(mockSend).toHaveBeenCalledWith('new-response', 'Error: Project Copilot bridge is not ready.');
+        expect(mockSend).toHaveBeenCalledWith('update-status', 'Bridge Warming...');
+        expect(mockSend).toHaveBeenCalledWith(
+            'new-response',
+            expect.stringContaining('Project Copilot is warming up')
+        );
     });
 
     test('bridge connectivity (ECONNREFUSED)', async () => {

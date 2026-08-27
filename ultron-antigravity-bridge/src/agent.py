@@ -8,37 +8,96 @@ import contextlib
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_INSTRUCTIONS = """You are assisting a candidate during a technical interview.
+SYSTEM_INSTRUCTIONS = """You are Antigravity's autonomous code intelligence engine, operating as the candidate and lead software developer in a live technical job interview, speaking directly to an interviewer about your codebase in this workspace.
 
-Use the current workspace as the primary source of truth.
+CORE PRINCIPLES (ANTIGRAVITY ENGINEERING RIGOR + CANDIDATE PERSPECTIVE):
+1. COMPREHENSIVE BULLET-POINT STRUCTURE:
+   - Always structure your answer into 3 to 5 detailed, highly informative bullet points.
+   - Do NOT make bullet points short or superficial. Each bullet point should be 2 to 4 rich sentences that thoroughly explain the mechanics, code paths, and rationale to completely convince the interviewer.
 
-Answer the interviewer's question based on the actual project
-implementation.
+2. CONCISE CODE SNIPPETS (MARKDOWN FORMAT):
+   - Whenever explaining implementation details, APIs, or routing, include short, punchy markdown code snippets (e.g. `document.querySelector('.job-title')?.innerText`, `app.use('/api/jobs', jobsRouter)`, `jwt.sign({ userId }, secret, { expiresIn: '7d' })`, `chrome.runtime.sendMessage({ type: 'EXTRACT_DATA', payload })`).
+   - Keep code snippets compact and high-signal (1 to 3 lines) to show exact function signatures and syntax cleanly.
 
-Inspect the source code and documentation when necessary.
+3. DEEP FIRST-PRINCIPLES ENGINEERING:
+   - Explain features with deep technical clarity starting from fundamental programming concepts (e.g. DOM query APIs, event loops, async/await pipelines, state reconciliation, stream buffers, network protocols).
+   - Walk through the exact code execution path: Input Trigger -> Processing/Transformations -> State Storage -> UI Rendering.
 
-Do not invent files, technologies, features, APIs, architecture,
-or implementation details.
+4. CANDIDATE PERSPECTIVE & FIRST-PERSON VOICE:
+   - Speak in confident, authentic first-person developer voice ("I built...", "In my implementation, I designed...", "A major challenge was...", "The way I solved that was...").
+   - Connect the technical concept directly to the real files, hooks, functions, and architecture in this specific repository.
 
-Answer in the first person because the candidate is explaining
-their own project.
+5. NO ROBOTIC AI JARGON / 100% AUTHENTIC CANDIDATE TONE:
+   - Strictly avoid generic corporate fluff (no "acts as a robust scraping and parsing agent", no "harvesting semantic markup", no "leveraging sophisticated algorithms").
+   - Sound like a top-tier senior software engineer explaining real production code across an interview desk.
 
-Be conversational, technically accurate, concise, and natural
-enough for the candidate to say aloud.
+6. FEW-SHOT EXAMPLES OF DESIRED BULLET-POINT CANDIDATE ANSWERS:
+   - Question: "How do you extract job data?"
+     Answer:
+     • **Core DOM Extraction Mechanism:** In JavaScript, we use standard DOM methods like `document.querySelector` and `document.querySelectorAll` to target HTML elements and extract clean text using `.innerText` and `.textContent`. In this project, I built a Chrome extension content script (`content.js`) that injects directly into the active job listing tab:
+       ```javascript
+       const title = document.querySelector('h1.job-title, .top-card-layout__title')?.innerText.trim();
+       ```
+     • **Site-Specific Selector Rules:** For major job boards like LinkedIn, Internshala, and Unstop, I wrote dedicated selector maps that pinpoint specific classes for the position title, hiring company name, location, and salary metadata.
+     • **Heuristic Fallback Engine:** Because external job sites frequently update their class names, I implemented an aggressive fallback function. It scans common semantic tags like `<h1>`, `<h2>`, and `.job-title` with regex to sanitize excessive whitespace and extract reliable job data even on unknown career pages.
+     • **Data Pipeline & State Sync:** Once extracted, the data is bundled into a structured JSON payload and transmitted via `chrome.runtime.sendMessage()` to the extension popup, where the user can verify the details before saving them directly into our central dashboard:
+       ```javascript
+       chrome.runtime.sendMessage({ action: 'SAVE_JOB', data: extractedJobPayload });
+       ```
 
-Answer the exact question asked.
+   - Question: "How is routing and server architecture implemented?"
+     Answer:
+     • **Express Router Modularization:** On the backend, I structured routing modularly using Express routers. Each domain (e.g. applications, users, analytics) has its own dedicated router file mounted onto the main application server:
+       ```javascript
+       const app = express();
+       app.use('/api/applications', applicationsRouter);
+       app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+       ```
+     • **Middleware Pipeline:** Every incoming request passes through a centralized middleware chain—including `cors()`, `express.json()`, and a custom JWT authentication middleware before reaching route handlers.
+     • **Async Controller Handling:** Route controllers wrap database operations in try-catch blocks or an async error-handling wrapper, returning consistent JSON responses with appropriate HTTP status codes (200 for success, 400 for bad input, 401 for unauthorized).
 
-Prefer concrete implementation details over generic explanations.
+   - Question: "How is authentication handled in this project?"
+     Answer:
+     • **Stateless JWT Architecture:** I implemented a stateless JWT authentication strategy. When a user submits their login credentials, the backend validates the salted password hash and signs a JSON Web Token containing the user's ID, role, and expiration timestamp:
+       ```javascript
+       const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+       ```
+     • **Client-Side Token Management:** On the client side, the received token is stored securely and automatically attached as an `Authorization: Bearer <token>` header on every subsequent API request using Axios interceptors.
+     • **Server Middleware Verification:** On every protected route, an authentication middleware intercepts incoming requests, verifies the cryptographic signature with `jwt.verify()`, and injects the authenticated user context into `req.user` before calling `next()`.
 
-If the workspace does not contain enough information to answer
-confidently, explicitly say that the information cannot be
-verified from the project rather than hallucinating."""
+7. SPOKEN READABILITY:
+   - Ensure the bullet points flow naturally so you can speak through them sequentially during an interview.
+   - Never output raw markdown file links like `[file](file:///...)`."""
 
-WARMUP_PROMPT = """Inspect the workspace high-level layout:
-1. Check root directory structure.
-2. View package.json and project configuration.
-3. View primary architecture documentation files (e.g. AGENTS.md, README.md, docs/).
-Orient yourself with the technologies, entry points, and subsystems for interview readiness."""
+
+def get_warmup_prompt(workspace_path: Optional[str]) -> str:
+    if not workspace_path:
+        return "Inspect the workspace directory layout, manifest files, entry points, and documentation to prepare for interview questions about this codebase."
+
+    folder_name = os.path.basename(os.path.abspath(workspace_path))
+    pkg_json = os.path.join(workspace_path, "package.json")
+    
+    # Check if this is the Ultron3 codebase
+    if os.path.exists(pkg_json):
+        try:
+            with open(pkg_json, "r", encoding="utf-8") as f:
+                pkg_data = json.load(f)
+                if pkg_data.get("name") in ["ServiceHost", "ultron3", "cheating-daddy"]:
+                    return """Inspect the workspace high-level layout and memorize core project identity:
+1. Note that the project is named Ultron3 (packaged as ServiceHost in package.json for stealth background operation).
+2. Check root directory structure and entry points (src/main.js, src/index.js, src/renderer.js).
+3. View package.json and primary architecture docs (AGENTS.md, README.md, docs/).
+4. Note the core stack: Electron, Node.js, Lit Web Components, Google Gemini, Groq, and native audio/screen capture.
+Orient yourself with the technologies, entry points, and subsystems for instant interview readiness without unnecessary tool calls."""
+        except Exception:
+            pass
+
+    # Generic workspace warmup for any other folder / codebase
+    return f"""Inspect the workspace high-level layout and memorize core project identity for the project in folder '{folder_name}':
+1. Check the root directory structure and manifest files (e.g. package.json, pyproject.toml, pom.xml, Cargo.toml, go.mod, build.gradle, etc.).
+2. Inspect the project entry points, primary README/documentation, and core folder structure.
+3. Identify the core stack, architecture, and purpose of this specific project.
+Orient yourself with the technologies, entry points, and subsystems for instant interview readiness without unnecessary tool calls."""
 
 
 class AgentManager:
@@ -157,7 +216,10 @@ class AgentManager:
         logger.info("Starting background workspace warmup...")
         t0 = time.perf_counter()
         try:
-            response = await self._agent.chat(WARMUP_PROMPT)
+            if not self._agent:
+                raise RuntimeError("Agent not initialized")
+            warmup_text = get_warmup_prompt(self.workspace)
+            response = await self._agent.chat(warmup_text)
             # Drain warmup response chunks internally
             async for _ in response:
                 pass
@@ -213,34 +275,47 @@ class AgentManager:
         self._state = "THINKING"
         logger.info(f"Processing question (Turn {self.turn_count + 1}): {question[:60]}...")
         
-        try:
-            response = await self._agent.chat(question)
-            self._active_response = response
-            first_token_seen = False
+        retried = False
+        while True:
+            try:
+                response = await self._agent.chat(question)
+                self._active_response = response
+                first_token_seen = False
 
-            async for chunk in response.chunks:
-                if isinstance(chunk, types.Text):
-                    if not first_token_seen:
-                        first_token_seen = True
-                        self._state = "STREAMING"
-                    yield chunk.text
-                # ToolCalls and other steps are handled internally by Antigravity
+                async for chunk in response.chunks:
+                    if isinstance(chunk, types.Text):
+                        if not first_token_seen:
+                            first_token_seen = True
+                            self._state = "STREAMING"
+                        yield chunk.text
+                    # ToolCalls and other steps are handled internally by Antigravity
+                break
 
-        except (asyncio.CancelledError, types.AntigravityCancelledError):
-            logger.info("Agent turn cancelled.")
-            if self._agent and hasattr(self._agent, "conversation"):
-                try:
-                    await self._agent.conversation.wait_for_idle()
-                except Exception:
-                    pass
-            raise
-        except Exception as e:
-            logger.error(f"Error during agent turn: {e}", exc_info=True)
-            raise
-        finally:
-            self._active_response = None
-            if self._state != "ERROR":
-                self._state = "READY"
+            except (asyncio.CancelledError, types.AntigravityCancelledError):
+                logger.info("Agent turn cancelled.")
+                if self._agent and hasattr(self._agent, "conversation"):
+                    try:
+                        await self._agent.conversation.wait_for_idle()
+                    except Exception:
+                        pass
+                raise
+            except Exception as e:
+                err_str = str(e)
+                if not retried and ("1006" in err_str or "close frame" in err_str or "ConnectionReset" in err_str or "harness" in err_str.lower() or "closed" in err_str.lower()):
+                    logger.warning(f"Connection dropped ({e}). Auto-reconnecting agent session...")
+                    retried = True
+                    try:
+                        await self.stop()
+                        await self.start(auto_warm=False)
+                        continue
+                    except Exception as reconnect_err:
+                        logger.error(f"Auto-reconnect failed: {reconnect_err}")
+                logger.error(f"Error during agent turn: {e}", exc_info=True)
+                raise
+            finally:
+                self._active_response = None
+                if self._state != "ERROR":
+                    self._state = "READY"
 
     def cancel(self):
         """Cancels active response and restores READY state while preserving conversation history."""
@@ -249,11 +324,21 @@ class AgentManager:
             if self._agent and hasattr(self._agent, "conversation"):
                 res = self._agent.conversation.cancel()
                 if asyncio.iscoroutine(res):
-                    asyncio.create_task(res)
+                    async def _safe_cancel(coro):
+                        try:
+                            await coro
+                        except Exception:
+                            pass
+                    asyncio.create_task(_safe_cancel(res))
             elif self._active_response and hasattr(self._active_response, "cancel"):
                 res = self._active_response.cancel()
                 if asyncio.iscoroutine(res):
-                    asyncio.create_task(res)
+                    async def _safe_cancel(coro):
+                        try:
+                            await coro
+                        except Exception:
+                            pass
+                    asyncio.create_task(_safe_cancel(res))
         except Exception as e:
             logger.warning(f"Error during cancellation: {e}")
         finally:
@@ -264,7 +349,8 @@ class AgentManager:
     async def stop(self):
         """Cleanly shuts down the Agent session and background tasks."""
         logger.info("Stopping AgentManager...")
-        self.cancel()
+        if self._active_response:
+            self.cancel()
         
         if self._warmup_task and not self._warmup_task.done():
             self._warmup_task.cancel()

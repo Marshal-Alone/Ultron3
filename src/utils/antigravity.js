@@ -3,8 +3,10 @@ const ipcMain = electron.ipcMain || electron?.default?.ipcMain;
 const BrowserWindow = electron.BrowserWindow || electron?.default?.BrowserWindow;
 const http = require('http');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const os = require('os');
+const { spawn, exec } = require('child_process');
 const PromptLogger = require('./promptLogger');
 
 // State
@@ -12,6 +14,7 @@ let activeRequestIdCounter = 0;
 let activeRequestId = null;
 let activeRequest = null;
 let accumulatedText = '';
+let bridgeProcess = null;
 
 // Helper to send to renderer
 function sendToRenderer(channel, data) {
@@ -36,6 +39,69 @@ function cancelActiveRequest() {
     accumulatedText = '';
 }
 
+function startBridgeProcess() {
+    const sessionPath = path.join(os.homedir(), '.ultron', 'session.json');
+    if (fsSync.existsSync(sessionPath) || bridgeProcess) {
+        sendToRenderer('update-status', 'Bridge Ready 🟢');
+        return;
+    }
+
+    const bridgeDir = path.join(__dirname, '..', '..', 'ultron-antigravity-bridge');
+    const pythonExe = process.platform === 'win32'
+        ? path.join(bridgeDir, 'venv', 'Scripts', 'pythonw.exe')
+        : path.join(bridgeDir, 'venv', 'bin', 'python');
+
+    try {
+        bridgeProcess = spawn(pythonExe, ['run.py'], {
+            cwd: bridgeDir,
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: true,
+        });
+        if (typeof bridgeProcess.unref === 'function') {
+            bridgeProcess.unref();
+        }
+        sendToRenderer('update-status', 'Bridge Starting 🟢');
+        console.log('[Antigravity] Started background stealth bridge process');
+    } catch (err) {
+        console.error('[Antigravity] Failed to spawn bridge:', err);
+        sendToRenderer('update-status', 'Bridge Error 🔴');
+    }
+}
+
+function stopBridgeProcess() {
+    cancelActiveRequest();
+    if (process.platform === 'win32') {
+        try {
+            exec('taskkill /F /IM pythonw.exe', () => {});
+        } catch (_) {}
+    } else if (bridgeProcess) {
+        try {
+            bridgeProcess.kill();
+        } catch (e) {}
+    }
+    bridgeProcess = null;
+
+    const sessionPath = path.join(os.homedir(), '.ultron', 'session.json');
+    try {
+        if (fsSync.existsSync(sessionPath)) {
+            fsSync.unlinkSync(sessionPath);
+        }
+    } catch (_) {}
+
+    sendToRenderer('update-status', 'Bridge Stopped 🔴');
+    console.log('[Antigravity] Stopped background bridge process');
+}
+
+function toggleBridgeProcess() {
+    const sessionPath = path.join(os.homedir(), '.ultron', 'session.json');
+    if (fsSync.existsSync(sessionPath) || bridgeProcess) {
+        stopBridgeProcess();
+    } else {
+        startBridgeProcess();
+    }
+}
+
 // Bind to PromptLogger events to automatically cancel Project Copilot when standard AI queries start
 PromptLogger.events.on('new-ai-request', () => {
     cancelActiveRequest();
@@ -43,14 +109,33 @@ PromptLogger.events.on('new-ai-request', () => {
 
 async function triggerProjectQuestion() {
     // 1. Check for question
-    const question = (PromptLogger.lastQuestion || '').trim();
+    const question = (PromptLogger.lastQuestion || PromptLogger.liveTranscript || '').trim();
     if (!question) {
         sendToRenderer('update-status', '⚠️ No speech heard yet');
         return;
     }
 
-    // 2. Prepare new request state
+    // Ensure main window is visible to the user
+    if (BrowserWindow && typeof BrowserWindow.getAllWindows === 'function') {
+        try {
+            const windows = BrowserWindow.getAllWindows();
+            if (windows && windows.length > 0 && typeof windows[0]?.isVisible === 'function' && !windows[0].isVisible()) {
+                if (typeof windows[0].showInactive === 'function') {
+                    windows[0].showInactive();
+                }
+            }
+        } catch (e) {}
+    }
+
+    // 2. Prepare new request state & cancel any active Groq/Gemini streaming
     cancelActiveRequest();
+    try {
+        const groqAI = require('./groq');
+        if (groqAI && typeof groqAI.cancel === 'function') {
+            groqAI.cancel();
+        }
+    } catch (e) {}
+
     const currentReqId = `req_${Date.now()}_${++activeRequestIdCounter}`;
     activeRequestId = currentReqId;
     accumulatedText = '';
@@ -64,18 +149,19 @@ async function triggerProjectQuestion() {
         const fileContent = await fs.readFile(sessionPath, 'utf8');
         sessionData = JSON.parse(fileContent);
     } catch (e) {
-        console.error('[Antigravity] Failed to read session.json:', e);
+        console.log('[Antigravity] session.json not found, auto-starting stealth bridge...');
+        startBridgeProcess();
         if (currentReqId === activeRequestId) {
-            sendToRenderer('update-status', 'Disconnected');
-            sendToRenderer('new-response', 'Error: Project Copilot bridge is not running.');
+            sendToRenderer('update-status', 'Starting Bridge...');
+            sendToRenderer('new-response', '⚡ **Project Copilot bridge is starting in stealth background mode...**\n\n*Please press `Ctrl + P` in a few seconds once warmup is complete.*');
         }
         return;
     }
 
     if (!sessionData || sessionData.status !== 'ready' || !sessionData.port || !sessionData.token) {
         if (currentReqId === activeRequestId) {
-            sendToRenderer('update-status', 'Disconnected');
-            sendToRenderer('new-response', 'Error: Project Copilot bridge is not ready.');
+            sendToRenderer('update-status', 'Bridge Warming...');
+            sendToRenderer('new-response', '⏳ **Project Copilot is warming up...**\n\n*Please press `Ctrl + P` again in a moment.*');
         }
         return;
     }
@@ -131,16 +217,21 @@ async function triggerProjectQuestion() {
             if (currentReqId !== activeRequestId) return;
             buffer += chunk.toString('utf8');
 
-            let splitIndex;
-            while ((splitIndex = buffer.indexOf('\n\n')) >= 0) {
-                const eventText = buffer.slice(0, splitIndex);
-                buffer = buffer.slice(splitIndex + 2);
-                processSseEvent(eventText, currentReqId);
+            let match;
+            while ((match = buffer.match(/\r?\n\r?\n/)) !== null) {
+                const eventText = buffer.slice(0, match.index);
+                buffer = buffer.slice(match.index + match[0].length);
+                if (eventText.trim()) {
+                    processSseEvent(eventText, currentReqId);
+                }
             }
         });
 
         res.on('end', () => {
             if (currentReqId === activeRequestId) {
+                if (buffer.trim()) {
+                    processSseEvent(buffer, currentReqId);
+                }
                 sendToRenderer('update-status', 'Ready');
                 activeRequest = null;
             }
@@ -221,6 +312,9 @@ module.exports = {
     setupAntigravityIpcHandlers,
     triggerProjectQuestion,
     cancelActiveRequest,
-    processSseEvent
+    processSseEvent,
+    startBridgeProcess,
+    stopBridgeProcess,
+    toggleBridgeProcess
 };
 

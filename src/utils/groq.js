@@ -38,8 +38,17 @@ class GroqAIService {
     constructor() {
         this.conversationHistory = [];
         this.isGenerating = false;
+        this.activeSessionId = 0;
         this.defaultModel = 'qwen/qwen3.6-27b';
         this.fallbackModel = 'llama-3.1-8b-instant';
+    }
+
+    /**
+     * Cancel any active Groq generation or screenshot pipeline
+     */
+    cancel() {
+        this.activeSessionId++;
+        this.isGenerating = false;
     }
 
     /**
@@ -301,6 +310,7 @@ class GroqAIService {
      * @returns {Promise<{success: boolean, text?: string, error?: string, model: string}>}
      */
     async analyzeScreenshot(base64Data, prompt) {
+        const sessionId = ++this.activeSessionId;
         const visionModelName = 'qwen/qwen3.6-27b';
         const initialSolveModelName = 'openai/gpt-oss-120b';
         const verificationModelName = 'openai/gpt-oss-120b';
@@ -318,7 +328,9 @@ class GroqAIService {
             console.log('---------------------------------------------------------------------');
             console.log('[IMAGE]: Attached Base64 Image');
             console.log('=====================================================================');
-            sendToRenderer('new-response', 'Analyzing image and extracting code (Stage 1/3)...');
+            if (sessionId === this.activeSessionId) {
+                sendToRenderer('new-response', 'Analyzing image and extracting code (Stage 1/3)...');
+            }
 
             const visionResponse = await client.chat.completions.create({
                 model: visionModelName,
@@ -338,16 +350,24 @@ class GroqAIService {
                 temperature: 0.1,
             });
 
+            if (sessionId !== this.activeSessionId) return { success: false, error: 'Cancelled' };
+
             const extractedText = visionResponse.choices[0]?.message?.content || '';
+            const cleanQuestion = stripThinkingTags(extractedText).trim();
+            if (cleanQuestion) {
+                PromptLogger.setLiveTranscript(cleanQuestion);
+            }
 
             console.log('\n[SCREENSHOT] PIPELINE STAGE 2: INITIAL SOLVE');
             console.log('======================== [PAYLOAD SENT TO AI] ========================');
             console.log(`[MODEL]: ${initialSolveModelName}`);
             console.log('[SYSTEM PROMPT]:\n' + `You are an AI coding assistant. Follow these user instructions strictly and exactly:\n${prompt}`);
             console.log('---------------------------------------------------------------------');
-            console.log('[EXTRACTED CODE / QUESTION]:\n' + extractedText);
+            console.log('[EXTRACTED CODE / QUESTION]:\n' + cleanQuestion);
             console.log('=====================================================================');
-            sendToRenderer('new-response', 'Generating initial solution (Stage 2/3)...\n\n');
+            if (sessionId === this.activeSessionId) {
+                sendToRenderer('new-response', 'Generating initial solution (Stage 2/3)...\n\n');
+            }
 
             const stream = await client.chat.completions.create({
                 model: initialSolveModelName,
@@ -358,7 +378,7 @@ class GroqAIService {
                     },
                     {
                         role: 'user',
-                        content: `Here is the text/code extracted from an image:\n\n${extractedText}\n\nSolve the problem or answer the question according to the system instructions. Explain your reasoning first step-by-step, then give the final code.\n\nCRITICAL RULES FOR FINAL CODE:\n1. If the image shows an online editor with a pre-defined class or method (like LeetCode/HackerRank), output ONLY the exact logic needed to fill in the blanks or complete the method. Do NOT rewrite the existing class or method signatures.\n2. Do NOT include any comments in your code.\n3. Output only the pure code inside a single markdown code block.\n4. EXTREMELY IMPORTANT: If the problem matches any of the specific programs listed in the 'USER CUSTOM INSTRUCTIONS' (e.g. 'NUMBER TO BINARY', 'ARMSTRONG NUMBER', etc.), you MUST output the EXACT code provided by the user for that problem VERBATIM. Do not change a single character of their provided solution. This overrides all other rules.`,
+                        content: `Here is the text/code extracted from an image:\n\n${cleanQuestion}\n\nSolve the problem or answer the question according to the system instructions. Explain your reasoning first step-by-step, then give the final code.\n\nCRITICAL RULES FOR FINAL CODE:\n1. If the image shows an online editor with a pre-defined class or method (like LeetCode/HackerRank), output ONLY the exact logic needed to fill in the blanks or complete the method. Do NOT rewrite the existing class or method signatures.\n2. Do NOT include any comments in your code.\n3. Output only the pure code inside a single markdown code block.\n4. EXTREMELY IMPORTANT: If the problem matches any of the specific programs listed in the 'USER CUSTOM INSTRUCTIONS' (e.g. 'NUMBER TO BINARY', 'ARMSTRONG NUMBER', etc.), you MUST output the EXACT code provided by the user for that problem VERBATIM. Do not change a single character of their provided solution. This overrides all other rules.`,
                     },
                 ],
                 max_tokens: 2048,
@@ -371,6 +391,7 @@ class GroqAIService {
             let lastSendTime = Date.now();
 
             for await (const chunk of stream) {
+                if (sessionId !== this.activeSessionId) return { success: false, error: 'Cancelled' };
                 const chunkText = chunk.choices[0]?.delta?.content || '';
                 if (chunkText) {
                     fullText += chunkText;
@@ -379,7 +400,9 @@ class GroqAIService {
                     if (displayText.length > 0) {
                         const now = Date.now();
                         if (isFirst || now - lastSendTime > 100) {
-                            sendToRenderer(isFirst ? 'new-response' : 'update-response', displayText);
+                            if (sessionId === this.activeSessionId) {
+                                sendToRenderer(isFirst ? 'new-response' : 'update-response', displayText);
+                            }
                             isFirst = false;
                             lastSendTime = now;
                         }
@@ -387,8 +410,10 @@ class GroqAIService {
                 }
             }
 
+            if (sessionId !== this.activeSessionId) return { success: false, error: 'Cancelled' };
+
             const initialSolution = stripThinkingTags(fullText);
-            if (initialSolution.length > 0 && !isFirst) {
+            if (initialSolution.length > 0 && !isFirst && sessionId === this.activeSessionId) {
                 sendToRenderer('update-response', initialSolution);
             }
 
@@ -399,14 +424,16 @@ class GroqAIService {
             console.log('---------------------------------------------------------------------');
             console.log('[PROPOSED SOLUTION TO VERIFY]:\n' + initialSolution);
             console.log('=====================================================================');
-            sendToRenderer('update-response', initialSolution + '\n\n---\n*Verifying solution... (Stage 3/3)*\n');
+            if (sessionId === this.activeSessionId) {
+                sendToRenderer('update-response', initialSolution + '\n\n---\n*Verifying solution... (Stage 3/3)*\n');
+            }
 
             const verifyStream = await client.chat.completions.create({
                 model: verificationModelName,
                 messages: [
                     {
                         role: 'user',
-                        content: `Problem:\n${extractedText}\n\nProposed solution:\n${initialSolution}\n\nCarefully verify this is correct according to these instructions: ${prompt}\n\nIf there's a bug, fix it and give the corrected code. If it's completely correct, just return the exact same code with no changes. Explain your reasoning first step-by-step.\n\nCRITICAL RULES FOR FINAL CODE:\n1. If the image shows an online editor with a pre-defined class or method (like LeetCode/HackerRank), output ONLY the exact logic needed to fill in the blanks or complete the method. Do NOT rewrite the existing class or method signatures.\n2. Do NOT include any comments in your code.\n3. Output only the pure code inside a single markdown code block.`,
+                        content: `Problem:\n${cleanQuestion}\n\nProposed solution:\n${initialSolution}\n\nCarefully verify this is correct according to these instructions: ${prompt}\n\nIf there's a bug, fix it and give the corrected code. If it's completely correct, just return the exact same code with no changes. Explain your reasoning first step-by-step.\n\nCRITICAL RULES FOR FINAL CODE:\n1. If the image shows an online editor with a pre-defined class or method (like LeetCode/HackerRank), output ONLY the exact logic needed to fill in the blanks or complete the method. Do NOT rewrite the existing class or method signatures.\n2. Do NOT include any comments in your code.\n3. Output only the pure code inside a single markdown code block.`,
                     },
                 ],
                 max_tokens: 2048,
@@ -419,6 +446,7 @@ class GroqAIService {
             let lastVerifySendTime = Date.now();
 
             for await (const chunk of verifyStream) {
+                if (sessionId !== this.activeSessionId) return { success: false, error: 'Cancelled' };
                 const chunkText = chunk.choices[0]?.delta?.content || '';
                 if (chunkText) {
                     verifiedText += chunkText;
@@ -427,7 +455,9 @@ class GroqAIService {
                     if (displayVerifiedText.length > 0) {
                         const now = Date.now();
                         if (isVerifyFirst || now - lastVerifySendTime > 100) {
-                            sendToRenderer('update-response', initialSolution + '\n\n---\n**Verified Solution:**\n\n' + displayVerifiedText);
+                            if (sessionId === this.activeSessionId) {
+                                sendToRenderer('update-response', initialSolution + '\n\n---\n**Verified Solution:**\n\n' + displayVerifiedText);
+                            }
                             isVerifyFirst = false;
                             lastVerifySendTime = now;
                         }
@@ -435,13 +465,15 @@ class GroqAIService {
                 }
             }
 
+            if (sessionId !== this.activeSessionId) return { success: false, error: 'Cancelled' };
+
             const finalVerifiedText = stripThinkingTags(verifiedText);
             const finalOutput = initialSolution + '\n\n---\n**Verified Solution:**\n\n' + finalVerifiedText;
 
             console.log('\n[SCREENSHOT] FINAL VERIFIED SOLUTION:');
             console.log(finalVerifiedText);
 
-            if (finalVerifiedText.length > 0) {
+            if (finalVerifiedText.length > 0 && sessionId === this.activeSessionId) {
                 sendToRenderer('update-response', finalOutput);
             }
 

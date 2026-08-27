@@ -466,6 +466,9 @@ export class CheatingDaddyApp extends LitElement {
         }
 
         // Normal response handling
+        if (this.currentView !== 'assistant') {
+            this.currentView = 'assistant';
+        }
         // Add a new response entry (first word of a new AI response)
         this.responses = [...this.responses, response];
         this.currentResponseIndex = this.responses.length - 1;
@@ -492,6 +495,9 @@ export class CheatingDaddyApp extends LitElement {
         }
 
         // Normal response handling
+        if (this.currentView !== 'assistant') {
+            this.currentView = 'assistant';
+        }
         // Update the current response in place (streaming subsequent words)
         if (this.responses.length > 0) {
             this.responses = [...this.responses.slice(0, -1), response];
